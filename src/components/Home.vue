@@ -1,8 +1,10 @@
 <script setup>
 import { Codemirror } from 'vue-codemirror'
 import { ref } from 'vue'
-import { plainText as example_v } from '@/assets/example.v'
-import { plainText as example_xdc } from '@/assets/example.xdc'
+import { plainText as fpgaol1_v } from '@/assets/fpgaol1.v'
+import { plainText as fpgaol1_xdc } from '@/assets/fpgaol1.xdc'
+import { plainText as fpgaol2_v } from '@/assets/fpgaol2.v'
+import { plainText as fpgaol2_xdc } from '@/assets/fpgaol2.xdc'
 import { StreamLanguage } from '@codemirror/language'
 import { verilog } from '@codemirror/legacy-modes/mode/verilog'
 import axios from 'axios'
@@ -13,14 +15,24 @@ const xdc = ref('')
 
 const extensions = [StreamLanguage.define(verilog)]
 
-function click_me() {
-  job_id.value = Math.round(Math.random() * 8388607 + 8388608).toString(16)
-  v.value = example_v
-  xdc.value = example_xdc
+function new_job_id() {
+	return Math.round(Math.random() * 8388607 + 8388608).toString(16)
+}
+
+function click_me_fpgaol1() {
+  job_id.value = new_job_id();
+  v.value = fpgaol1_v
+  xdc.value = fpgaol1_xdc
+}
+
+function click_me_fpgaol2() {
+  job_id.value = new_job_id();
+  v.value = fpgaol2_v
+  xdc.value = fpgaol2_xdc
 }
 
 const polling = ref(false)
-const timeout = 5000
+const timeout = 3000
 const bitstream_available = ref(false)
 const log_available = ref(false)
 
@@ -97,8 +109,8 @@ function download(filetype) {
             Initialize(Click me)
           </button>
           <div class="dropdown-menu">
-            <a class="dropdown-item" id="example_fpgaol1">FPGAOL1(for login users)</a>
-            <a class="dropdown-item" id="example_fpgaol2" @click="click_me">
+            <a class="dropdown-item" id="example_fpgaol1" @click="click_me_fpgaol1">FPGAOL1(for login users)</a>
+            <a class="dropdown-item" id="example_fpgaol2" @click="click_me_fpgaol2">
               FPGAOL2(for guests)
             </a>
           </div>

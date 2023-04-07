@@ -19,13 +19,15 @@ set_property -dict {PACKAGE_PIN P18 IOSTANDARD LVCMOS33} [get_ports {sw[5]}];
 set_property -dict {PACKAGE_PIN U12 IOSTANDARD LVCMOS33} [get_ports {sw[6]}];
 set_property -dict {PACKAGE_PIN U11 IOSTANDARD LVCMOS33} [get_ports {sw[7]}];
 
-set_property -dict {PACKAGE_PIN M16 IOSTANDARD LVCMOS33} [get_ports {uart_rx0}];
-set_property -dict {PACKAGE_PIN M17 IOSTANDARD LVCMOS33} [get_ports {uart_tx0}];
+set_property -dict {PACKAGE_PIN M16 IOSTANDARD LVCMOS33} [get_ports {uart_rx}];
+set_property -dict {PACKAGE_PIN M17 IOSTANDARD LVCMOS33} [get_ports {uart_tx}];
+set_property -dict {PACKAGE_PIN D3 IOSTANDARD LVCMOS33} [get_ports {uart_cts}];
+set_property -dict {PACKAGE_PIN E5 IOSTANDARD LVCMOS33} [get_ports {uart_rts}];
 
-set_property -dict {PACKAGE_PIN V14 IOSTANDARD LVCMOS33} [get_ports {hexplay0_an[0]}];
-set_property -dict {PACKAGE_PIN U14 IOSTANDARD LVCMOS33} [get_ports {hexplay0_an[1]}];
-set_property -dict {PACKAGE_PIN V11 IOSTANDARD LVCMOS33} [get_ports {hexplay0_an[2]}];
-set_property -dict {PACKAGE_PIN T10 IOSTANDARD LVCMOS33} [get_ports {hexplay0_d[0]}];
-set_property -dict {PACKAGE_PIN T9 IOSTANDARD LVCMOS33} [get_ports {hexplay0_d[1]}];
-set_property -dict {PACKAGE_PIN U13 IOSTANDARD LVCMOS33} [get_ports {hexplay0_d[2]}];
-set_property -dict {PACKAGE_PIN T13 IOSTANDARD LVCMOS33} [get_ports {hexplay0_d[3]}];
+set_property -dict {PACKAGE_PIN V14 IOSTANDARD LVCMOS33} [get_ports {hexplay_an[0]}];
+set_property -dict {PACKAGE_PIN U14 IOSTANDARD LVCMOS33} [get_ports {hexplay_an[1]}];
+set_property -dict {PACKAGE_PIN V11 IOSTANDARD LVCMOS33} [get_ports {hexplay_an[2]}];
+set_property -dict {PACKAGE_PIN T10 IOSTANDARD LVCMOS33} [get_ports {hexplay_d[0]}];
+set_property -dict {PACKAGE_PIN T9 IOSTANDARD LVCMOS33} [get_ports {hexplay_d[1]}];
+set_property -dict {PACKAGE_PIN U13 IOSTANDARD LVCMOS33} [get_ports {hexplay_d[2]}];
+set_property -dict {PACKAGE_PIN T13 IOSTANDARD LVCMOS33} [get_ports {hexplay_d[3]}];
