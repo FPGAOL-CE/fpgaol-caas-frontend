@@ -98,7 +98,7 @@ function submit() {
       inputFpgaPart: fpga_part.value,
       inputXdcFile: xdc.value,
       inputSrcFile1: v.value,
-	  inputTopName: top_name.value,
+      inputTopName: top_name.value
     })
   )
   polling.value = true
@@ -145,7 +145,7 @@ function download(filetype) {
                   'fpgaol1.xdc',
                   'top.v',
                   'xc7a100tcsg324-1',
-				  'top'
+                  'top'
                 )
               "
               >FPGAOL1(for login users)</a
@@ -158,8 +158,8 @@ function download(filetype) {
                   'fpgaol2/basic',
                   'fpgaol2.xdc',
                   'top.v',
-                  'xc7a100tcsg324-1', 
-				  'top'
+                  'xc7a100tcsg324-1',
+                  'top'
                 )
               "
               >FPGAOL2(for guests)</a
@@ -172,8 +172,8 @@ function download(filetype) {
                   'blinky-digilent-arty',
                   'blinky.xdc',
                   'blinky.v',
-                  'xc7a35tcsg324-1', 
-				  'blinky'
+                  'xc7a35tcsg324-1',
+                  'blinky'
                 )
               "
               >Digilent Arty -- blinky</a
@@ -186,8 +186,8 @@ function download(filetype) {
                   'blinky-qmtech',
                   'blinky.xdc',
                   'blinky.v',
-                  'xc7k325tffg676-1', 
-				  'blinky'
+                  'xc7k325tffg676-1',
+                  'blinky'
                 )
               "
               >QMTech Kintex 7 -- blinky</a
@@ -200,8 +200,8 @@ function download(filetype) {
                   'blinky-genesys2',
                   'blinky.xdc',
                   'blinky.v',
-                  'xc7k325tffg676-1', 
-				  'blinky'
+                  'xc7k325tffg676-1',
+                  'blinky'
                 )
               "
               >Digilent Genesys 2 -- blinky</a
