@@ -141,6 +141,20 @@ function download(filetype) {
               @click="
                 click_me(
                   'FPGAOL-CE/user-examples',
+                  'basys3',
+                  'Basys3_Master.xdc',
+                  'top.v',
+                  'xc7a35tcpg236-1',
+                  'top'
+                )
+              "
+              >Digilent Basys 3 -- blinky</a
+            >
+            <a
+              class="dropdown-item"
+              @click="
+                click_me(
+                  'FPGAOL-CE/user-examples',
                   'fpgaol1/basic',
                   'fpgaol1.xdc',
                   'top.v',
@@ -200,7 +214,7 @@ function download(filetype) {
                   'blinky-genesys2',
                   'blinky.xdc',
                   'blinky.v',
-                  'xc7k325tffg676-1',
+                  'xc7k325tffg900-1',
                   'blinky'
                 )
               "
