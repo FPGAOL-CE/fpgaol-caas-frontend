@@ -10,6 +10,7 @@ import { verilog } from '@codemirror/legacy-modes/mode/verilog'
 import axios from 'axios'
 
 const job_id = ref('')
+const job_id_bare = ref('')
 const top_name = ref('')
 const fpga_part = ref('')
 const v = ref('')
@@ -21,16 +22,18 @@ function new_job_id() {
   return Math.round(Math.random() * 8388607 + 8388608).toString(16)
 }
 
-job_id.value = new_job_id()
+job_id_bare.value = new_job_id()
+job_id.value = job_id_bare.value
 
 function click_me_blank() {
   v.value = ''
   xdc.value = ''
   fpga_part.value = ''
-  job_id.value = new_job_id()
+  job_id_bare.value = new_job_id()
+  job_id.value = job_id_bare.value
 }
 
-function click_me(repo, path, xdc_name, v_name, device, top) {
+function click_me(repo, path, xdc_name, v_name, device, top, jobidname) {
   var gitbase = 'https://raw.githubusercontent.com/'
   var xdc_url = gitbase + repo + '/main/' + path + '/' + xdc_name
   var v_url = gitbase + repo + '/main/' + path + '/' + v_name
@@ -55,6 +58,7 @@ function click_me(repo, path, xdc_name, v_name, device, top) {
   // todo: should make these happen in sequence...
   fpga_part.value = device
   top_name.value = top
+  job_id.value = jobidname + '_' + job_id_bare.value
 }
 
 const polling = ref(false)
@@ -71,6 +75,7 @@ function poll() {
     .get(import.meta.env.VITE_HOST + '/status/' + job_id.value)
     .then(({ data }) => {
       console.log(data)
+	  // now we handle each possible response explicitly, and stop(let user submit again) immediately after vague things happened
       if (data.includes('finished')) {
         console.log('Done!')
         if (data.includes('succeeded')) {
@@ -80,13 +85,18 @@ function poll() {
         server_reply.value = data
         polling.value = false
       } else {
-        server_reply.value = animarr[cntr++ % 4] + '\t' + data
-        window.setTimeout(poll, timeout)
+        if (!data.includes('running') && !data.includes('pending')) {
+          server_reply.value = 'Compiling went wrong, please try again: ' + '\t' + data
+          polling.value = false
+        } else {
+          server_reply.value = animarr[cntr++ % 4] + '\t' + data
+          window.setTimeout(poll, timeout)
+        }
       }
     })
     .catch(({ err }) => {
-      server_reply.value = animarr[cntr++ % 4] + '\t' + err
-      window.setTimeout(poll, timeout)
+      server_reply.value = 'Error communicating with server, please try again: ' + '\t' + err
+      polling.value = false
     })
 }
 
@@ -145,12 +155,14 @@ function download(filetype) {
                   'Basys3_Master.xdc',
                   'top.v',
                   'xc7a35tcpg236-1',
-                  'top'
+                  'top',
+                  'basys3'
                 )
               "
               >Digilent Basys 3 -- blinky</a
             >
             <a
+              v-if="VITE_VERSION === 'regymm'"
               class="dropdown-item"
               @click="
                 click_me(
@@ -159,12 +171,14 @@ function download(filetype) {
                   'fpgaol1.xdc',
                   'top.v',
                   'xc7a100tcsg324-1',
-                  'top'
+                  'top',
+                  'fpgaol1'
                 )
               "
               >FPGAOL1(for login users)</a
             >
             <a
+              v-if="VITE_VERSION === 'regymm'"
               class="dropdown-item"
               @click="
                 click_me(
@@ -173,7 +187,8 @@ function download(filetype) {
                   'fpgaol2.xdc',
                   'top.v',
                   'xc7a100tcsg324-1',
-                  'top'
+                  'top',
+                  'fpgaol2'
                 )
               "
               >FPGAOL2(for guests)</a
@@ -187,10 +202,26 @@ function download(filetype) {
                   'blinky.xdc',
                   'blinky.v',
                   'xc7a35tcsg324-1',
-                  'blinky'
+                  'blinky',
+                  'arty35t'
                 )
               "
-              >Digilent Arty -- blinky</a
+              >Digilent Arty 35t -- blinky</a
+            >
+            <a
+              class="dropdown-item"
+              @click="
+                click_me(
+                  'openxc7/demo-projects',
+                  'blinky-digilent-arty',
+                  'blinky.xdc',
+                  'blinky.v',
+                  'xc7a100tcsg324-1',
+                  'blinky',
+                  'arty100t'
+                )
+              "
+              >Digilent Arty 100t -- blinky</a
             >
             <a
               class="dropdown-item"
@@ -214,8 +245,9 @@ function download(filetype) {
                   'blinky-genesys2',
                   'blinky.xdc',
                   'blinky.v',
-                  'xc7k325tffg900-1',
-                  'blinky'
+                  'xc7k325tffg900-2',
+                  'blinky',
+                  'genesys2'
                 )
               "
               >Digilent Genesys 2 -- blinky</a
