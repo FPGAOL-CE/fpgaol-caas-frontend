@@ -9,8 +9,11 @@ import { StreamLanguage } from '@codemirror/language'
 import { verilog } from '@codemirror/legacy-modes/mode/verilog'
 import axios from 'axios'
 
-const job_id = ref('')
+const version = ref(import.meta.env.VITE_VERSION)
+
+const job_id_prefix = ref('')
 const job_id_bare = ref('')
+const job_id = ref('')
 const top_name = ref('')
 const fpga_part = ref('')
 const v = ref('')
@@ -22,15 +25,12 @@ function new_job_id() {
   return Math.round(Math.random() * 8388607 + 8388608).toString(16)
 }
 
-job_id_bare.value = new_job_id()
-job_id.value = job_id_bare.value
-
 function click_me_blank() {
   v.value = ''
   xdc.value = ''
   fpga_part.value = ''
   job_id_bare.value = new_job_id()
-  job_id.value = job_id_bare.value
+  job_id_prefix.value = 'custom'
 }
 
 function click_me(repo, path, xdc_name, v_name, device, top, jobidname) {
@@ -58,7 +58,7 @@ function click_me(repo, path, xdc_name, v_name, device, top, jobidname) {
   // todo: should make these happen in sequence...
   fpga_part.value = device
   top_name.value = top
-  job_id.value = jobidname + '_' + job_id_bare.value
+  job_id_prefix.value = jobidname
 }
 
 const polling = ref(false)
@@ -75,7 +75,7 @@ function poll() {
     .get(import.meta.env.VITE_HOST + '/status/' + job_id.value)
     .then(({ data }) => {
       console.log(data)
-	  // now we handle each possible response explicitly, and stop(let user submit again) immediately after vague things happened
+      // now we handle each possible response explicitly, and stop(let user submit again) immediately after vague things happened
       if (data.includes('finished')) {
         console.log('Done!')
         if (data.includes('succeeded')) {
@@ -101,6 +101,8 @@ function poll() {
 }
 
 function submit() {
+  job_id_bare.value = new_job_id()
+  job_id.value = job_id_prefix.value + '_' + job_id_bare.value
   axios.post(
     import.meta.env.VITE_HOST + '/submit',
     new URLSearchParams({
@@ -147,22 +149,7 @@ function download(filetype) {
           </button>
           <div class="dropdown-menu">
             <a
-              class="dropdown-item"
-              @click="
-                click_me(
-                  'FPGAOL-CE/user-examples',
-                  'basys3',
-                  'Basys3_Master.xdc',
-                  'top.v',
-                  'xc7a35tcpg236-1',
-                  'top',
-                  'basys3'
-                )
-              "
-              >Digilent Basys 3 -- blinky</a
-            >
-            <a
-              v-if="VITE_VERSION === 'regymm'"
+              v-if="version !== 'symbioticeda'"
               class="dropdown-item"
               @click="
                 click_me(
@@ -178,7 +165,7 @@ function download(filetype) {
               >FPGAOL1(for login users)</a
             >
             <a
-              v-if="VITE_VERSION === 'regymm'"
+              v-if="version !== 'symbioticeda'"
               class="dropdown-item"
               @click="
                 click_me(
@@ -192,6 +179,21 @@ function download(filetype) {
                 )
               "
               >FPGAOL2(for guests)</a
+            >
+            <a
+              class="dropdown-item"
+              @click="
+                click_me(
+                  'FPGAOL-CE/user-examples',
+                  'basys3',
+                  'Basys3_Master.xdc',
+                  'top.v',
+                  'xc7a35tcpg236-1',
+                  'top',
+                  'basys3'
+                )
+              "
+              >Digilent Basys 3 -- blinky</a
             >
             <a
               class="dropdown-item"
@@ -232,7 +234,8 @@ function download(filetype) {
                   'blinky.xdc',
                   'blinky.v',
                   'xc7k325tffg676-1',
-                  'blinky'
+                  'blinky',
+                  'qmtechk7'
                 )
               "
               >QMTech Kintex 7 -- blinky</a
@@ -256,10 +259,10 @@ function download(filetype) {
           </div>
         </div>
         <div class="form-group col-md-3">
-          <label for="inputJobId">JobID</label>
+          <label for="inputJobId">Preset</label>
           <input
             disabled
-            v-model="job_id"
+            v-model="job_id_prefix"
             type="text"
             class="form-control"
             id="inputJobId"

@@ -29,6 +29,15 @@ import 'bootstrap/dist/js/bootstrap'
           </router-link>
         </li>
         <li class="nav-item">
+          <router-link
+            to="/feedback"
+            class="nav-link"
+            :class="{ active: $route.path == '/feedback' }"
+          >
+            FEEDBACK
+          </router-link>
+        </li>
+        <li class="nav-item">
           <router-link to="/about" class="nav-link" :class="{ active: $route.path == '/about' }">
             ABOUT
           </router-link>
