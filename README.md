@@ -2,9 +2,9 @@
 
 #### Try it out!
 
-[](https://caas.symbioticeda.com)
+[On SymbioticEDA](https://caas.symbioticeda.com)
 
-[](http://149.28.136.195:18888)
+[On a certain homelab](http://149.28.136.195:18888)
 
 #### Development
 
