@@ -11,8 +11,8 @@ function send_fb() {
     .post(
       import.meta.env.VITE_HOST + '/feedback',
       new URLSearchParams({
-        fbContact: fb_contact,
-        fbContent: fb_content
+        fbContact: fb_contact.value,
+        fbContent: fb_content.value
       })
     )
     .then(() => {
