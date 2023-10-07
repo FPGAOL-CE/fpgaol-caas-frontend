@@ -1,10 +1,6 @@
 <script setup>
 import { Codemirror } from 'vue-codemirror'
 import { ref } from 'vue'
-//import { plainText as fpgaol1_v } from '@/assets/fpgaol1.v'
-//import { plainText as fpgaol1_xdc } from '@/assets/fpgaol1.xdc'
-//import { plainText as fpgaol2_v } from '@/assets/fpgaol2.v'
-//import { plainText as fpgaol2_xdc } from '@/assets/fpgaol2.xdc'
 import { StreamLanguage } from '@codemirror/language'
 import { verilog } from '@codemirror/legacy-modes/mode/verilog'
 import axios from 'axios'

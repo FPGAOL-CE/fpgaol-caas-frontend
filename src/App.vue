@@ -29,6 +29,11 @@ import 'bootstrap/dist/js/bootstrap'
           </router-link>
         </li>
         <li class="nav-item">
+          <router-link to="/projcomp" class="nav-link" :class="{ active: $route.path == '/' }">
+            PROJ_COMPILE
+          </router-link>
+        </li>
+        <li class="nav-item">
           <router-link
             to="/feedback"
             class="nav-link"
