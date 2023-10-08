@@ -1,6 +1,7 @@
 <script setup>
 import { Codemirror } from 'vue-codemirror'
 import { ref } from 'vue'
+import { computed } from 'vue'
 import { StreamLanguage } from '@codemirror/language'
 import { verilog } from '@codemirror/legacy-modes/mode/verilog'
 import axios from 'axios'
@@ -12,8 +13,20 @@ const job_id_bare = ref('')
 const job_id = ref('')
 const top_name = ref('')
 const fpga_part = ref('')
+const auto_fpga_part = ref('')
+const backend = ref('')
+const auto_backend = ref('')
+window.fpga_part = fpga_part
+window.backend = backend
 const v = ref('')
 const xdc = ref('')
+const conf = computed(() => {return `[project]
+Backend = ${backend.value}
+Part = ${fpga_part.value}
+Top = ${top_name.value}
+Sources = *.v
+Constraints = *.xdc`})
+//window.conf = conf
 
 const extensions = [StreamLanguage.define(verilog)]
 
@@ -52,13 +65,14 @@ function click_me(repo, path, xdc_name, v_name, device, top, jobidname) {
       server_reply.value += '\nLoading verilog code from GitHub failed: ' + err
     })
   // todo: should make these happen in sequence...
+  backend.value = 'openxc7'
   fpga_part.value = device
   top_name.value = top
   job_id_prefix.value = jobidname
 }
 
 const polling = ref(false)
-const timeout = 3000
+const timeout = 3000 // query interval
 const bitstream_available = ref(false)
 const log_available = ref(false)
 
@@ -99,13 +113,17 @@ function poll() {
 function submit() {
   job_id_bare.value = new_job_id()
   job_id.value = job_id_prefix.value + '_' + job_id_bare.value
+  conf.value = ''
   axios.post(
     import.meta.env.VITE_HOST + '/submit',
     new URLSearchParams({
       inputJobId: job_id.value,
-      inputFpgaPart: fpga_part.value,
       inputXdcFile: xdc.value,
-      inputSrcFile1: v.value,
+      inputSrcFile: v.value,
+	  inputConfFile: conf.value,
+      // we keep the backward compatibility
+      inputFpgaPart: fpga_part.value,
+      inputSrcFile1: v.value, 
       inputTopName: top_name.value
     })
   )
@@ -133,7 +151,7 @@ function download(filetype) {
   <div class="container">
     <form method="POST" action="submit" @submit.prevent="submit">
       <div class="row">
-        <div class="btn-group form-group col-md-3 dropdown">
+        <div class="btn-group form-group col-md-2 dropdown">
           <button
             type="button"
             class="btn btn-danger dropdown-toggle"
@@ -141,7 +159,7 @@ function download(filetype) {
             aria-haspopup="true"
             aria-expanded="false"
           >
-            Initialize(Click me)
+            Template
           </button>
           <div class="dropdown-menu">
             <a
@@ -254,27 +272,38 @@ function download(filetype) {
             <a class="dropdown-item" @click="click_me_blank">Reset</a>
           </div>
         </div>
-        <div class="form-group col-md-3">
-          <label for="inputJobId">Preset</label>
+        <div class="form-group col-md-2">
+          <label for="inputJobId">Template Name</label>
           <input
-            disabled
             v-model="job_id_prefix"
             type="text"
             class="form-control"
             id="inputJobId"
             name="inputJobId"
-            readonly
           />
         </div>
-        <div class="form-group col-md-3">
+        <div class="form-group col-md-2">
           <label for="inputFpgaPart">FPGA Part</label>
-          <select id="inputFpgaPart" class="form-control" name="inputFpgaPart" disabled>
-            <option selected>Auto ({{ fpga_part }})</option>
-            <option>xc7a100tcsg324-1</option>
+          <select id="inputFpgaPart" class="form-control" name="inputFpgaPart">
+            <option selected value="auto_fpga_part">Auto ({{ fpga_part }})</option>
+            <option>xc7a35tcpg236-1</option>
             <option>xc7a35tcsg324-1</option>
+            <option>xc7a100tcsg324-1</option>
+            <option>xc7k325tffg676-1</option>
+            <option>xc7k325tffg900-2</option>
           </select>
         </div>
-        <div class="form-group col-md-3">
+        <div class="form-group col-md-2">
+          <label>Backend</label>
+          <select id="" class="form-control" name="">
+            <option selected>Auto ({{ backend }})</option>
+            <option>openxc7</option>
+            <option>f4pga</option>
+            <option>vivado</option>
+            <option>yosyshq</option>
+          </select>
+        </div>
+        <div class="form-group col-md-2">
           <label for="inputTopName">Top Module Name</label>
           <input
             v-model="top_name"
