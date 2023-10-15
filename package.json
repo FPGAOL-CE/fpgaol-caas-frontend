@@ -7,7 +7,8 @@
     "build": "vite build",
     "preview": "vite preview",
     "lint": "eslint . --ext .vue,.js,.jsx,.cjs,.mjs --fix --ignore-path .gitignore",
-    "format": "prettier --write src/"
+    "format": "prettier --write src/",
+    "start": "node server.js"
   },
   "dependencies": {
     "@codemirror/language": "^6.6.0",
@@ -16,6 +17,7 @@
     "axios": "^1.3.4",
     "bootstrap": "^5.2.3",
     "codemirror": "^6.0.1",
+    "express": "^4.18.2",
     "vue": "^3.2.47",
     "vue-codemirror": "^6.1.1",
     "vue-router": "^4.1.6"
