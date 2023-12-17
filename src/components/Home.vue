@@ -16,16 +16,17 @@ const fpga_part = ref('')
 const auto_fpga_part = ref('')
 const backend = ref('')
 const auto_backend = ref('')
-window.fpga_part = fpga_part
-window.backend = backend
 const v = ref('')
 const xdc = ref('')
 const conf = computed(() => {return `[project]
-Backend = ${backend.value}
-Part = ${fpga_part.value}
+Backend = ${backend.value == 'auto' ? auto_backend.value : backend.value}
+Part = ${fpga_part.value == 'auto' ? auto_fpga_part.value : fpga_part.value}
 Top = ${top_name.value}
 Sources = *.v
 Constraints = *.xdc`})
+
+//window.fpga_part = fpga_part
+//window.backend = backend
 //window.conf = conf
 
 const extensions = [StreamLanguage.define(verilog)]
@@ -42,7 +43,7 @@ function click_me_blank() {
   job_id_prefix.value = 'custom'
 }
 
-function click_me(repo, path, xdc_name, v_name, device, top, jobidname) {
+function click_me(repo, path, xdc_name, v_name, device, bend, top, jobidname) {
   var gitbase = 'https://raw.githubusercontent.com/'
   var xdc_url = gitbase + repo + '/main/' + path + '/' + xdc_name
   var v_url = gitbase + repo + '/main/' + path + '/' + v_name
@@ -64,9 +65,10 @@ function click_me(repo, path, xdc_name, v_name, device, top, jobidname) {
     .catch(({ err }) => {
       server_reply.value += '\nLoading verilog code from GitHub failed: ' + err
     })
-  // todo: should make these happen in sequence...
-  backend.value = 'openxc7'
-  fpga_part.value = device
+  backend.value = 'auto'
+  auto_backend.value = bend
+  fpga_part.value = 'auto'
+  auto_fpga_part.value = device
   top_name.value = top
   job_id_prefix.value = jobidname
 }
@@ -172,6 +174,7 @@ function download(filetype) {
                   'fpgaol1.xdc',
                   'top.v',
                   'xc7a100tcsg324-1',
+				  'openxc7',
                   'top',
                   'fpgaol1'
                 )
@@ -188,6 +191,7 @@ function download(filetype) {
                   'fpgaol2.xdc',
                   'top.v',
                   'xc7a100tcsg324-1',
+				  'openxc7',
                   'top',
                   'fpgaol2'
                 )
@@ -203,6 +207,7 @@ function download(filetype) {
                   'Basys3_Master.xdc',
                   'top.v',
                   'xc7a35tcpg236-1',
+				  'openxc7',
                   'top',
                   'basys3'
                 )
@@ -218,6 +223,7 @@ function download(filetype) {
                   'blinky.xdc',
                   'blinky.v',
                   'xc7a35tcsg324-1',
+				  'openxc7',
                   'blinky',
                   'arty35t'
                 )
@@ -233,6 +239,7 @@ function download(filetype) {
                   'blinky.xdc',
                   'blinky.v',
                   'xc7a100tcsg324-1',
+				  'openxc7',
                   'blinky',
                   'arty100t'
                 )
@@ -248,6 +255,7 @@ function download(filetype) {
                   'blinky.xdc',
                   'blinky.v',
                   'xc7k325tffg676-1',
+				  'openxc7',
                   'blinky',
                   'qmtechk7'
                 )
@@ -263,6 +271,7 @@ function download(filetype) {
                   'blinky.xdc',
                   'blinky.v',
                   'xc7k325tffg900-2',
+				  'openxc7',
                   'blinky',
                   'genesys2'
                 )
@@ -273,7 +282,7 @@ function download(filetype) {
           </div>
         </div>
         <div class="form-group col-md-2">
-          <label for="inputJobId">Template Name</label>
+          <label for="inputJobId">Name</label>
           <input
             v-model="job_id_prefix"
             type="text"
@@ -283,9 +292,9 @@ function download(filetype) {
           />
         </div>
         <div class="form-group col-md-2">
-          <label for="inputFpgaPart">FPGA Part</label>
-          <select id="inputFpgaPart" class="form-control" name="inputFpgaPart">
-            <option selected value="auto_fpga_part">Auto ({{ fpga_part }})</option>
+          <label>FPGA Part</label>
+          <select id="" class="form-control" name="" v-model="fpga_part">
+            <option selected value="auto">Auto ({{ auto_fpga_part }})</option>
             <option>xc7a35tcpg236-1</option>
             <option>xc7a35tcsg324-1</option>
             <option>xc7a100tcsg324-1</option>
@@ -295,16 +304,14 @@ function download(filetype) {
         </div>
         <div class="form-group col-md-2">
           <label>Backend</label>
-          <select id="" class="form-control" name="">
-            <option selected>Auto ({{ backend }})</option>
+          <select id="" class="form-control" name="" v-model="backend">
+            <option selected value="auto">Auto ({{ auto_backend }})</option>
             <option>openxc7</option>
-            <option>f4pga</option>
-            <option>vivado</option>
             <option>yosyshq</option>
           </select>
         </div>
         <div class="form-group col-md-2">
-          <label for="inputTopName">Top Module Name</label>
+          <label for="inputTopName">Top Module</label>
           <input
             v-model="top_name"
             type="text"
@@ -314,6 +321,16 @@ function download(filetype) {
           />
         </div>
       </div>
+	  <div>
+		  <!--debug section-->
+		  {{ auto_fpga_part }}
+		  {{ auto_backend }}
+		  <br>
+		  {{ fpga_part }}
+		  {{ backend }}
+		  <br>
+		  {{ conf }}
+	  </div>
       <div class="row my-2">
         <div class="form-group col-md-6">
           <label for="inputXdcFile">Constraint(XDC) file</label>
