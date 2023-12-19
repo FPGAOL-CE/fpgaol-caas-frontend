@@ -302,7 +302,7 @@ function download(filetype) {
                   'ulx3s',
                   'ulx3s_v20.lpf',
                   'blinky.v',
-                  'lfe5u-25f-6bg381c',
+                  'lfe5u-25f-cabga381',
 				  'ecp5',
                   'top',
                   'ulx3s'
@@ -327,17 +327,276 @@ function download(filetype) {
           <label>FPGA Part</label>
           <select id="" class="form-control" name="" v-model="fpga_part">
             <option selected value="auto">Auto ({{ auto_fpga_part }})</option>
-            <option>xc7a35tcpg236-1</option>
-            <option>xc7a35tcsg324-1</option>
-            <option>xc7a100tcsg324-1</option>
-            <option>xc7k325tffg676-1</option>
-            <option>xc7k325tffg900-2</option>
-            <option>ice40up5k-sg48</option>
-            <option>ice40lp1k-cm36</option>
-            <option>ice40lp1k-qn84</option>
-            <option>lfe5u-25f-6bg381c</option>
-            <option>lfe5u-45f-6bg381c</option>
-            <option>lfe5u-85f-6bg381c</option>
+			<optgroup label="Lattice ICE40">
+				<option>iCE40-HX1K-CB132</option>
+				<option>iCE40-HX1K-TQ144</option>
+				<option>iCE40-HX1K-VQ100</option>
+				<option>iCE40-HX4K-BG121</option>
+				<option>iCE40-HX4K-CB132</option>
+				<option>iCE40-HX4K-TQ144</option>
+				<option>iCE40-HX8K-BG121</option>
+				<option>iCE40-HX8K-CB132</option>
+				<option>iCE40-HX8K-CM225</option>
+				<option>iCE40-HX8K-CT256</option>
+				<option>iCE40-LP1K-CB121</option>
+				<option>iCE40-LP1K-CB81</option>
+				<option>iCE40-LP1K-CM121</option>
+				<option>iCE40-LP1K-CM36</option>
+				<option>iCE40-LP1K-CM49</option>
+				<option>iCE40-LP1K-CM81</option>
+				<option>iCE40-LP1K-QN84</option>
+				<option>iCE40-LP1K-SWG16</option>
+				<option>iCE40-LP384-CM36</option>
+				<option>iCE40-LP384-CM49</option>
+				<option>iCE40-LP384-QN32</option>
+				<option>iCE40-LP4K-CM121</option>
+				<option>iCE40-LP4K-CM225</option>
+				<option>iCE40-LP4K-CM81</option>
+				<option>iCE40-LP8K-CM121</option>
+				<option>iCE40-LP8K-CM225</option>
+				<option>iCE40-LP8K-CM81</option>
+				<option>iCE40-UP3K-UWG30</option>
+				<option>iCE40-UP5K-SG48</option>
+				<option>iCE40-UP5K-UWG30</option>
+            </optgroup>
+			<optgroup label="Lattice ECP5">
+				<option>lfe5u-12f-cabga256</option>
+				<option>lfe5u-12f-cabga381</option>
+				<option>lfe5u-12f-csfgba285</option>
+				<option>lfe5u-12f-tqft144</option>
+
+				<option>lfe5u-25f-cabga256</option>
+				<option>lfe5u-25f-cabga381</option>
+				<option>lfe5u-25f-csfgba285</option>
+				<option>lfe5u-25f-tqft144</option>
+
+				<option>lfe5u-45f-cabga256</option>
+				<option>lfe5u-45f-cabga381</option>
+				<option>lfe5u-45f-cabga554</option>
+				<option>lfe5u-45f-csfgba285</option>
+				<option>lfe5u-45f-tqft144</option>
+
+				<option>lfe5u-85f-cabga381</option>
+				<option>lfe5u-85f-cabga554</option>
+				<option>lfe5u-85f-cabga756</option>
+				<option>lfe5u-85f-csfgba285</option>
+
+				<option>lfe5um-25f-cabga256</option>
+				<option>lfe5um-25f-cabga381</option>
+				<option>lfe5um-25f-csfgba285</option>
+
+				<option>lfe5um-45f-cabga256</option>
+				<option>lfe5um-45f-cabga381</option>
+				<option>lfe5um-45f-cabga554</option>
+				<option>lfe5um-45f-csfgba285</option>
+
+				<option>lfe5um-85f-cabga381</option>
+				<option>lfe5um-85f-cabga554</option>
+				<option>lfe5um-85f-cabga756</option>
+				<option>lfe5um-85f-csfgba285</option>
+
+				<option>lfe5um5g-25f-cabga256</option>
+				<option>lfe5um5g-25f-cabga381</option>
+				<option>lfe5um5g-25f-csfgba285</option>
+
+				<option>lfe5um5g-45f-cabga256</option>
+				<option>lfe5um5g-45f-cabga381</option>
+				<option>lfe5um5g-45f-cabga554</option>
+				<option>lfe5um5g-45f-csfgba285</option>
+
+				<option>lfe5um5g-85f-cabga381</option>
+				<option>lfe5um5g-85f-cabga554</option>
+				<option>lfe5um5g-85f-cabga756</option>
+				<option>lfe5um5g-85f-csfgba285</option>
+            </optgroup>
+            <optgroup label="Xilinx 7 Series">
+				<option disabled>Spartan 7</option>
+				<option>xc7s50ftgb196-1</option>
+				<option>xc7s50ftgb196-1IL</option>
+				<option>xc7s50ftgb196-2</option>
+				<option>xc7s50csga324-1</option>
+				<option>xc7s50csga324-1IL</option>
+				<option>xc7s50csga324-2</option>
+				<option>xc7s50fgga484-1</option>
+				<option>xc7s50fgga484-1IL</option>
+				<option>xc7s50fgga484-2</option>
+				<option disabled>Artix 7</option>
+				<option>xc7a100tcsg324-1</option>
+				<option>xc7a100tcsg324-2</option>
+				<option>xc7a100tcsg324-2L</option>
+				<option>xc7a100tcsg324-3</option>
+				<option>xc7a100tfgg484-1</option>
+				<option>xc7a100tfgg484-2</option>
+				<option>xc7a100tfgg484-2L</option>
+				<option>xc7a100tfgg484-3</option>
+				<option>xc7a100tfgg676-1</option>
+				<option>xc7a100tfgg676-2</option>
+				<option>xc7a100tfgg676-2L</option>
+				<option>xc7a100tfgg676-3</option>
+				<option>xc7a100tftg256-1</option>
+				<option>xc7a100tftg256-2</option>
+				<option>xc7a100tftg256-2L</option>
+				<option>xc7a100tftg256-3</option>
+				<option>xc7a200tfbg484-1</option>
+				<option>xc7a200tfbg484-2</option>
+				<option>xc7a200tfbg484-2L</option>
+				<option>xc7a200tfbg484-3</option>
+				<option>xc7a200tfbg676-1</option>
+				<option>xc7a200tfbg676-2</option>
+				<option>xc7a200tfbg676-2L</option>
+				<option>xc7a200tfbg676-3</option>
+				<option>xc7a200tfbv484-1</option>
+				<option>xc7a200tfbv484-2</option>
+				<option>xc7a200tfbv484-2L</option>
+				<option>xc7a200tfbv484-3</option>
+				<option>xc7a200tfbv676-1</option>
+				<option>xc7a200tfbv676-2</option>
+				<option>xc7a200tfbv676-2L</option>
+				<option>xc7a200tfbv676-3</option>
+				<option>xc7a200tffg1156-1</option>
+				<option>xc7a200tffg1156-2</option>
+				<option>xc7a200tffg1156-2L</option>
+				<option>xc7a200tffg1156-3</option>
+				<option>xc7a200tffv1156-1</option>
+				<option>xc7a200tffv1156-2</option>
+				<option>xc7a200tffv1156-2L</option>
+				<option>xc7a200tffv1156-3</option>
+				<option>xc7a200tsbg484-1</option>
+				<option>xc7a200tsbg484-2</option>
+				<option>xc7a200tsbg484-2L</option>
+				<option>xc7a200tsbg484-3</option>
+				<option>xc7a200tsbv484-1</option>
+				<option>xc7a200tsbv484-2</option>
+				<option>xc7a200tsbv484-2L</option>
+				<option>xc7a200tsbv484-3</option>
+				<option>xc7a35tcpg236-1</option>
+				<option>xc7a35tcpg236-2</option>
+				<option>xc7a35tcpg236-2L</option>
+				<option>xc7a35tcpg236-3</option>
+				<option>xc7a35tcsg324-1</option>
+				<option>xc7a35tcsg324-2</option>
+				<option>xc7a35tcsg324-2L</option>
+				<option>xc7a35tcsg324-3</option>
+				<option>xc7a35tcsg325-1</option>
+				<option>xc7a35tcsg325-2</option>
+				<option>xc7a35tcsg325-2L</option>
+				<option>xc7a35tcsg325-3</option>
+				<option>xc7a35tfgg484-1</option>
+				<option>xc7a35tfgg484-2</option>
+				<option>xc7a35tfgg484-2L</option>
+				<option>xc7a35tfgg484-3</option>
+				<option>xc7a35tftg256-1</option>
+				<option>xc7a35tftg256-2</option>
+				<option>xc7a35tftg256-2L</option>
+				<option>xc7a35tftg256-3</option>
+				<option>xc7a50tcpg236-1</option>
+				<option>xc7a50tcpg236-2</option>
+				<option>xc7a50tcpg236-2L</option>
+				<option>xc7a50tcpg236-3</option>
+				<option>xc7a50tcsg324-1</option>
+				<option>xc7a50tcsg324-2</option>
+				<option>xc7a50tcsg324-2L</option>
+				<option>xc7a50tcsg324-3</option>
+				<option>xc7a50tcsg325-1</option>
+				<option>xc7a50tcsg325-2</option>
+				<option>xc7a50tcsg325-2L</option>
+				<option>xc7a50tcsg325-3</option>
+				<option>xc7a50tfgg484-1</option>
+				<option>xc7a50tfgg484-2</option>
+				<option>xc7a50tfgg484-2L</option>
+				<option>xc7a50tfgg484-3</option>
+				<option>xc7a50tftg256-1</option>
+				<option>xc7a50tftg256-2</option>
+				<option>xc7a50tftg256-2L</option>
+				<option>xc7a50tftg256-3</option>
+				<option disabled>Kintex 7</option>
+				<option>xc7k160tfbg484-2</option>
+				<option>xc7k160tfbg484-2L</option>
+				<option>xc7k160tfbg484-3</option>
+				<option>xc7k160tfbg676-1</option>
+				<option>xc7k160tfbg676-2</option>
+				<option>xc7k160tfbg676-2L</option>
+				<option>xc7k160tfbg676-3</option>
+				<option>xc7k160tfbv484-1</option>
+				<option>xc7k160tfbv484-2</option>
+				<option>xc7k160tfbv484-2L</option>
+				<option>xc7k160tfbv484-3</option>
+				<option>xc7k160tfbv676-1</option>
+				<option>xc7k160tfbv676-2</option>
+				<option>xc7k160tfbv676-2L</option>
+				<option>xc7k160tfbv676-3</option>
+				<option>xc7k160tffg676-1</option>
+				<option>xc7k160tffg676-2</option>
+				<option>xc7k160tffg676-2L</option>
+				<option>xc7k160tffg676-3</option>
+				<option>xc7k160tffv676-1</option>
+				<option>xc7k160tffv676-2</option>
+				<option>xc7k160tffv676-2L</option>
+				<option>xc7k160tffv676-3</option>
+				<option>xc7k325tffg676-1</option>
+				<option>xc7k325tffg900-2</option>
+				<option>xc7k420tffg1156-1</option>
+				<option>xc7k420tffg1156-2</option>
+				<option>xc7k420tffg1156-2L</option>
+				<option>xc7k420tffg1156-3</option>
+				<option>xc7k420tffg901-1</option>
+				<option>xc7k420tffg901-2</option>
+				<option>xc7k420tffg901-2L</option>
+				<option>xc7k420tffg901-3</option>
+				<option>xc7k420tffv1156-1</option>
+				<option>xc7k420tffv1156-2</option>
+				<option>xc7k420tffv1156-2L</option>
+				<option>xc7k420tffv1156-3</option>
+				<option>xc7k420tffv901-1</option>
+				<option>xc7k420tffv901-2</option>
+				<option>xc7k420tffv901-2L</option>
+				<option>xc7k420tffv901-3</option>
+				<option>xc7k480tffg1156-1</option>
+				<option>xc7k480tffg1156-2</option>
+				<option>xc7k480tffg1156-2L</option>
+				<option>xc7k480tffg1156-3</option>
+				<option>xc7k480tffg901-1</option>
+				<option>xc7k480tffg901-2</option>
+				<option>xc7k480tffg901-2L</option>
+				<option>xc7k480tffg901-3</option>
+				<option>xc7k480tffv1156-1</option>
+				<option>xc7k480tffv1156-2</option>
+				<option>xc7k480tffv1156-2L</option>
+				<option>xc7k480tffv1156-3</option>
+				<option>xc7k480tffv901-1</option>
+				<option>xc7k480tffv901-2</option>
+				<option>xc7k480tffv901-2L</option>
+				<option>xc7k480tffv901-3</option>
+				<option>xc7k70tfbg484-1</option>
+				<option>xc7k70tfbg484-2</option>
+				<option>xc7k70tfbg484-2L</option>
+				<option>xc7k70tfbg484-3</option>
+				<option>xc7k70tfbg676-1</option>
+				<option>xc7k70tfbg676-2</option>
+				<option>xc7k70tfbg676-2L</option>
+				<option>xc7k70tfbg676-3</option>
+				<option>xc7k70tfbv484-1</option>
+				<option>xc7k70tfbv484-2</option>
+				<option>xc7k70tfbv484-2L</option>
+				<option>xc7k70tfbv484-3</option>
+				<option>xc7k70tfbv676-1</option>
+				<option>xc7k70tfbv676-2</option>
+				<option>xc7k70tfbv676-2L</option>
+				<option>xc7k70tfbv676-3</option>
+				<option disabled>Zynq 7</option>
+				<option>xc7z010clg225-1</option>
+				<option>xc7z010clg225-2</option>
+				<option>xc7z010clg225-3</option>
+				<option>xc7z010clg400-1</option>
+				<option>xc7z010clg400-2</option>
+				<option>xc7z010clg400-3</option>
+				<option>xc7z020clg400-1</option>
+				<option>xc7z020clg400-2</option>
+				<option>xc7z020clg400-3</option>
+				<option>xc7z020clg484-1</option>
+				<option>xc7z020clg484-2</option>
+				<option>xc7z020clg484-3</option>
+            </optgroup>
           </select>
         </div>
         <div class="form-group col-md-2">
@@ -360,8 +619,8 @@ function download(filetype) {
           />
         </div>
       </div>
+	  <!--
 	  <div>
-		  <!--debug section-->
 		  {{ auto_fpga_part }}
 		  {{ auto_backend }}
 		  <br>
@@ -370,6 +629,7 @@ function download(filetype) {
 		  <br>
 		  {{ conf }}
 	  </div>
+	  -->
       <div class="row my-2">
         <div class="form-group col-md-6">
           <label for="inputXdcFile">Constraint(XDC) file</label>
