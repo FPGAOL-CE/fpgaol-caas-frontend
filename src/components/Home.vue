@@ -23,7 +23,7 @@ Backend = ${backend.value == 'auto' ? auto_backend.value : backend.value}
 Part = ${fpga_part.value == 'auto' ? auto_fpga_part.value : fpga_part.value}
 Top = ${top_name.value}
 Sources = *.v
-Constraints = *.xdc`})
+Constraints = *.xdc`}) // not necessarily xdc but just the constraint file...
 
 //window.fpga_part = fpga_part
 //window.backend = backend
@@ -278,6 +278,38 @@ function download(filetype) {
               "
               >Digilent Genesys 2 -- blinky</a
             >
+            <a
+              class="dropdown-item"
+              @click="
+                click_me(
+                  'FPGAOL-CE/user-examples',
+                  'icebreaker',
+                  'icebreaker.pcf',
+                  'pwm.v',
+                  'ice40up5k-sg48',
+				  'ice40',
+                  'top',
+                  'icebreaker'
+                )
+              "
+              >Icebreaker -- rgbled</a
+            >
+            <a
+              class="dropdown-item"
+              @click="
+                click_me(
+                  'FPGAOL-CE/user-examples',
+                  'ulx3s',
+                  'ulx3s_v20.lpf',
+                  'blinky.v',
+                  'lfe5u-25f-6bg381c',
+				  'ecp5',
+                  'top',
+                  'ulx3s'
+                )
+              "
+              >ULX3S -- blinky</a
+            >
             <a class="dropdown-item" @click="click_me_blank">Reset</a>
           </div>
         </div>
@@ -300,6 +332,12 @@ function download(filetype) {
             <option>xc7a100tcsg324-1</option>
             <option>xc7k325tffg676-1</option>
             <option>xc7k325tffg900-2</option>
+            <option>ice40up5k-sg48</option>
+            <option>ice40lp1k-cm36</option>
+            <option>ice40lp1k-qn84</option>
+            <option>lfe5u-25f-6bg381c</option>
+            <option>lfe5u-45f-6bg381c</option>
+            <option>lfe5u-85f-6bg381c</option>
           </select>
         </div>
         <div class="form-group col-md-2">
