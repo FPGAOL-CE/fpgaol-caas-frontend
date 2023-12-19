@@ -38,7 +38,10 @@ function new_job_id() {
 function click_me_blank() {
   v.value = ''
   xdc.value = ''
+  auto_fpga_part.value = ''
   fpga_part.value = ''
+  auto_backend.value = ''
+  backend.value = ''
   job_id_bare.value = new_job_id()
   job_id_prefix.value = 'custom'
 }
