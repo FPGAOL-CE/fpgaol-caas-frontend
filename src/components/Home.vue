@@ -345,7 +345,8 @@ function download(filetype) {
           <select id="" class="form-control" name="" v-model="backend">
             <option selected value="auto">Auto ({{ auto_backend }})</option>
             <option>openxc7</option>
-            <option>yosyshq</option>
+            <option>ice40</option>
+            <option>ecp5</option>
           </select>
         </div>
         <div class="form-group col-md-2">
