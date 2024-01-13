@@ -366,18 +366,18 @@ function download(filetype) {
 				<option>lfe5u-12f-cabga256</option>
 				<option>lfe5u-12f-cabga381</option>
 				<option>lfe5u-12f-csfgba285</option>
-				<option>lfe5u-12f-tqft144</option>
+				<option>lfe5u-12f-tqfp144</option>
 
 				<option>lfe5u-25f-cabga256</option>
 				<option>lfe5u-25f-cabga381</option>
 				<option>lfe5u-25f-csfgba285</option>
-				<option>lfe5u-25f-tqft144</option>
+				<option>lfe5u-25f-tqfp144</option>
 
 				<option>lfe5u-45f-cabga256</option>
 				<option>lfe5u-45f-cabga381</option>
 				<option>lfe5u-45f-cabga554</option>
 				<option>lfe5u-45f-csfgba285</option>
-				<option>lfe5u-45f-tqft144</option>
+				<option>lfe5u-45f-tqfp144</option>
 
 				<option>lfe5u-85f-cabga381</option>
 				<option>lfe5u-85f-cabga554</option>
