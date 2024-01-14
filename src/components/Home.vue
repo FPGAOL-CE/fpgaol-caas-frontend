@@ -286,6 +286,22 @@ function download(filetype) {
               @click="
                 click_me(
                   'FPGAOL-CE/user-examples',
+                  'tangnano9k',
+                  'tangnano9k.cst',
+                  'blinky.v',
+                  'GW1NR-LV9QN88PC6\\\/I5',
+				  'gowin',
+                  'top',
+                  'tangnano9k'
+                )
+              "
+              >Tang Nano 9K -- blinky</a
+            >
+            <a
+              class="dropdown-item"
+              @click="
+                click_me(
+                  'FPGAOL-CE/user-examples',
                   'icebreaker',
                   'icebreaker.pcf',
                   'pwm.v',
