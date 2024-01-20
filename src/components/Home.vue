@@ -428,6 +428,16 @@ function download(filetype) {
 				<option>lfe5um5g-85f-cabga756</option>
 				<option>lfe5um5g-85f-csfgba285</option>
             </optgroup>
+			<optgroup label="GOWIN">
+				<option value="GW1NZ-LV1QN48C6\/I5">GW1NZ-LV1QN48C6/I5 (Tang Nano 1K)</option>
+				<option value="GW1NSR-LV4CQN48PC7\/I6">GW1NSR-LV4CQN48PC7/I6 (Tang Nano 4K)</option>
+				<option value="GW1NR-LV9QN88PC6\/I5">GW1NR-LV9QN88PC6/I5 (Tang Nano 9K)</option>
+				<option value="GW1NR-LV9QN88C6\/I5">GW1NR-LV9QN88C6/I5 (TEC0117)</option>
+				<option value="GW2A-LV18PG256C8\/I7">GW2A-LV18PG256C8/I7 (Primer 20K)</option>
+				<option value="GW1N-UV4LQ144C6\/I5">GW1N-UV4LQ144C6/I5 (Gowin Runber)</option>
+				<option value="GW1N-LV1QN48C6\/I5">GW1N-LV1QN48C6/I5 (Original Tang Nano)</option>
+				<option value="GW1NS-UX2CQN48C5\/I4">GW1NS-UX2CQN48C5/I4 (honeycomb)</option>
+            </optgroup>
             <optgroup label="Xilinx 7 Series">
 				<option disabled>Spartan 7</option>
 				<option>xc7s50ftgb196-1</option>
