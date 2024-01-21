@@ -302,6 +302,22 @@ function download(filetype) {
               @click="
                 click_me(
                   'FPGAOL-CE/user-examples',
+                  'hdmi',
+                  'hdmi.cst',
+                  'fpga4fun_hdmi_test.v',
+                  'GW1NR-LV9QN88PC6\\\/I5',
+				  'gowin',
+                  'HDMI_test',
+                  'tangnano9k'
+                )
+              "
+              >Tang Nano 9K -- HDMI</a
+            >
+            <a
+              class="dropdown-item"
+              @click="
+                click_me(
+                  'FPGAOL-CE/user-examples',
                   'icebreaker',
                   'icebreaker.pcf',
                   'pwm.v',
