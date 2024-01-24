@@ -26,12 +26,14 @@ Part = ${part_inuse.value}
 Top = ${top_name.value}
 Sources = *.v
 Constraints = *.xdc
-BitName = ${bkend_inuse.value == 'gowin' ? 'top.fs' : 'top.bit'}
+Bitname = ${bkend_inuse.value == 'gowin' ? 'top.fs' : 'top.bit'}
 `})
 
-//window.fpga_part = fpga_part
-//window.backend = backend
-//window.conf = conf
+
+window.bkend_inuse = bkend_inuse
+window.fpga_part = fpga_part
+window.backend = backend
+window.conf = conf
 
 const extensions = [StreamLanguage.define(verilog)]
 
