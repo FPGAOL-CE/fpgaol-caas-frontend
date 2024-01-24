@@ -101,7 +101,7 @@ function poll() {
         polling.value = false
       } else {
         if (!data.includes('running') && !data.includes('pending')) {
-          server_reply.value = 'Compiling went wrong, please try again: ' + '\t' + data
+          server_reply.value = 'Compiling went wrong, please try again: ' + '\t' + data + ', are some files empty or entries missing?'
           polling.value = false
         } else {
           server_reply.value = animarr[cntr++ % 4] + '\t' + data
@@ -649,6 +649,7 @@ function download(filetype) {
           <select id="" class="form-control" name="" v-model="backend">
             <option selected value="auto">Auto ({{ auto_backend }})</option>
             <option>openxc7</option>
+            <option>gowin</option>
             <option>ice40</option>
             <option>ecp5</option>
           </select>
@@ -677,7 +678,7 @@ function download(filetype) {
 	  -->
       <div class="row my-2">
         <div class="form-group col-md-6">
-          <label for="inputXdcFile">Constraint(XDC) file</label>
+          <label for="inputXdcFile">Constraint file</label>
           <codemirror
             v-model="xdc"
             style="height: 500px; background-color: white"
