@@ -17,15 +17,16 @@ const auto_fpga_part = ref('')
 const part_inuse = computed(() => {return fpga_part.value == 'auto' ? auto_fpga_part.value : fpga_part.value})
 const backend = ref('')
 const auto_backend = ref('')
+const bkend_inuse = computed(() => {return backend.value == 'auto' ? auto_backend.value : backend.value})
 const v = ref('')
 const xdc = ref('')
 const conf = computed(() => {return `[project]
-Backend = ${backend.value == 'auto' ? auto_backend.value : backend.value}
+Backend = ${bkend_inuse.value}
 Part = ${part_inuse.value}
 Top = ${top_name.value}
 Sources = *.v
 Constraints = *.xdc
-BitName = ${part_inuse.value == 'gowin' ? 'top.fs' : 'top.bit'}
+BitName = ${bkend_inuse.value == 'gowin' ? 'top.fs' : 'top.bit'}
 `})
 
 //window.fpga_part = fpga_part
