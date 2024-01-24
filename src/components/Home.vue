@@ -14,16 +14,19 @@ const job_id = ref('')
 const top_name = ref('')
 const fpga_part = ref('')
 const auto_fpga_part = ref('')
+const part_inuse = computed(() => {return fpga_part.value == 'auto' ? auto_fpga_part.value : fpga_part.value})
 const backend = ref('')
 const auto_backend = ref('')
 const v = ref('')
 const xdc = ref('')
 const conf = computed(() => {return `[project]
 Backend = ${backend.value == 'auto' ? auto_backend.value : backend.value}
-Part = ${fpga_part.value == 'auto' ? auto_fpga_part.value : fpga_part.value}
+Part = ${part_inuse.value}
 Top = ${top_name.value}
 Sources = *.v
-Constraints = *.xdc`}) // not necessarily xdc but just the constraint file...
+Constraints = *.xdc
+BitName = ${part_inuse.value == 'gowin' ? 'top.fs' : 'top.bit'}
+`})
 
 //window.fpga_part = fpga_part
 //window.backend = backend
