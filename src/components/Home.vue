@@ -29,6 +29,8 @@ Constraints = *.xdc
 Bitname = ${bkend_inuse.value == 'gowin' ? 'top.fs' : 'top.bit'}
 `})
 
+const log_content = ref('');
+const show_log_section = ref('');
 
 window.bkend_inuse = bkend_inuse
 window.fpga_part = fpga_part
@@ -155,6 +157,33 @@ function submit() {
 
 function download(filetype) {
   window.location.href = `${import.meta.env.VITE_HOST}/download/${job_id.value}/${filetype}`
+}
+
+async function fetch_show_log() {
+  this.show_log_section = true;
+  this.log_content = 'Fetching log...';
+  const url = `${import.meta.env.VITE_HOST}/download/${this.job_id}/log`;
+  try {
+    const response = await fetch(url);
+	if (response.ok) {
+	  const text = await response.text();
+	  this.log_content = text;
+	  setTimeout(() => {
+	    const textarea = document.getElementById('log_textarea');
+        textarea.scrollTop = textarea.scrollHeight; // Scroll to bottom
+	  }, 0);
+//	  this.$nextTick(() => {
+//		const textarea = document.getElementById('log_textarea');
+//		textarea.scrollTop = textarea.scrollHeight; // Scroll to bottom
+//	  });
+	} else {
+	  console.error('Failed to fetch log.');
+	  this.log_content = 'Failed to fetch log.';
+	}
+  } catch (error) {
+	console.error('Error fetching log:', error);
+	this.log_content = 'Error fetching log.';
+  }
 }
 </script>
 
@@ -682,7 +711,7 @@ function download(filetype) {
 		  {{ conf }}
 	  </div>
 	  -->
-      <div class="row my-2">
+      <div class="row">
         <div class="form-group col-md-6">
           <label for="inputXdcFile">Constraint file</label>
           <codemirror
@@ -717,6 +746,22 @@ function download(filetype) {
     <p id="server_reply">{{ server_reply }}</p>
     <div class="row mb-2">
       <div class="btn-group bottom-button">
+        <button class="btn btn-primary" :disabled="!log_available" @click="fetch_show_log()">
+          Show Log
+        </button>
+      </div>
+      <div class="btn-group bottom-button">
+        <button class="btn btn-primary" :disabled="!log_available" @click="download('log')">
+          Download Log
+        </button>
+      </div>
+    </div>
+	<div v-if="show_log_section" class="form-group col-md-6">
+		<textarea class="form-control" id="log_textarea"> {{ log_content }}</textarea>
+	  <br>
+	</div>
+    <div class="row mb-2">
+      <div class="btn-group bottom-button">
         <button
           class="btn btn-primary"
           :disabled="!bitstream_available"
@@ -724,10 +769,14 @@ function download(filetype) {
         >
           Download Bitstream
         </button>
-      </div>
+	  </div>
       <div class="btn-group bottom-button">
-        <button class="btn btn-primary" :disabled="!log_available" @click="download('log')">
-          Download Log
+        <button
+          class="btn btn-primary"
+          :disabled="!bitstream_available"
+          @click="d"
+        >
+          Program Bitstream
         </button>
       </div>
     </div>
@@ -744,7 +793,9 @@ pre {
 }
 
 textarea.form-control {
-  height: 400px;
+  height: 200px;
+  font-size: 13px;
+  font-family: SFMono-Regular, Menlo, Monaco, Consolas, monospace;
 }
 
 .subtitle {
