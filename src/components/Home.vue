@@ -160,29 +160,25 @@ function download(filetype) {
 }
 
 async function fetch_show_log() {
-  this.show_log_section = true;
-  this.log_content = 'Fetching log...';
-  const url = `${import.meta.env.VITE_HOST}/download/${this.job_id}/log`;
+  show_log_section.value = true;
+  log_content.value = 'Fetching log...';
+  const url = `${import.meta.env.VITE_HOST}/download/${job_id.value}/log`;
   try {
     const response = await fetch(url);
 	if (response.ok) {
 	  const text = await response.text();
-	  this.log_content = text;
+	  log_content.value = text;
 	  setTimeout(() => {
 	    const textarea = document.getElementById('log_textarea');
         textarea.scrollTop = textarea.scrollHeight; // Scroll to bottom
 	  }, 0);
-//	  this.$nextTick(() => {
-//		const textarea = document.getElementById('log_textarea');
-//		textarea.scrollTop = textarea.scrollHeight; // Scroll to bottom
-//	  });
 	} else {
 	  console.error('Failed to fetch log.');
-	  this.log_content = 'Failed to fetch log.';
+	  log_content.value = 'Failed to fetch log.';
 	}
   } catch (error) {
 	console.error('Error fetching log:', error);
-	this.log_content = 'Error fetching log.';
+	log_content.value = 'Error fetching log.';
   }
 }
 </script>
