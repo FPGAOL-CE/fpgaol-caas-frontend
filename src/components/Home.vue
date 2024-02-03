@@ -2,8 +2,13 @@
 import { Codemirror } from 'vue-codemirror'
 import { ref } from 'vue'
 import { computed } from 'vue'
+import { onMounted } from 'vue'
+import { Terminal } from 'xterm'
+import { FitAddon } from 'xterm-addon-fit'
+import 'xterm/css/xterm.css'
 import { StreamLanguage } from '@codemirror/language'
 import { verilog } from '@codemirror/legacy-modes/mode/verilog'
+import Module from '/public/wasmFPGAloader_lite.js';
 import axios from 'axios'
 
 const version = ref(import.meta.env.VITE_VERSION)
@@ -20,17 +25,39 @@ const auto_backend = ref('')
 const bkend_inuse = computed(() => {return backend.value == 'auto' ? auto_backend.value : backend.value})
 const v = ref('')
 const xdc = ref('')
+const gh_conf = ref('')
+const bitname = computed(() => {return bkend_inuse.value == 'gowin' ? 'top.fs' : 'top.bit'})
 const conf = computed(() => {return `[project]
 Backend = ${bkend_inuse.value}
 Part = ${part_inuse.value}
 Top = ${top_name.value}
 Sources = *.v
 Constraints = *.xdc
-Bitname = ${bkend_inuse.value == 'gowin' ? 'top.fs' : 'top.bit'}
+Bitname = ${bitname.value}
 `})
 
-const log_content = ref('');
-const show_log_section = ref('');
+const github_url = ref('')
+
+const webusb_supported = ref('')
+const webusb_connected = ref('')
+const wfl_loaded = ref('')
+const log_content = ref('')
+const usblog_content = ref('')
+const usblog_xterm = new Terminal({
+  fontFamily: 'SFMono-Regular, Menlo, Monaco, Consolas, monospace',
+  fontSize: 14
+})
+const cable = ref('')
+const auto_cable = ref('')
+const flash_enabled = ref('')
+const cable_inuse = computed(() => {return cable.value == 'auto' ? auto_cable.value : cable.value})
+const wfl = ref('')
+
+cable.value = 'auto';
+auto_cable.value = 'ft2232';
+
+window.Module = Module;
+window.wfl = wfl;
 
 window.bkend_inuse = bkend_inuse
 window.fpga_part = fpga_part
@@ -47,11 +74,13 @@ function click_me_blank() {
   v.value = ''
   xdc.value = ''
   auto_fpga_part.value = ''
-  fpga_part.value = ''
+  fpga_part.value = 'auto'
   auto_backend.value = ''
-  backend.value = ''
+  backend.value = 'auto'
+  top_name.value = ''
   job_id_bare.value = new_job_id()
-  job_id_prefix.value = 'custom'
+  job_id_prefix.value = ''
+  cable.value = 'auto'
 }
 
 function click_me(repo, path, xdc_name, v_name, device, bend, top, jobidname) {
@@ -160,7 +189,6 @@ function download(filetype) {
 }
 
 async function fetch_show_log() {
-  show_log_section.value = true;
   log_content.value = 'Fetching log...';
   const url = `${import.meta.env.VITE_HOST}/download/${job_id.value}/log`;
   try {
@@ -181,13 +209,148 @@ async function fetch_show_log() {
 	log_content.value = 'Error fetching log.';
   }
 }
+
+
+function usb_log_append(text, error=0) {
+  if (error) usblog_xterm.write('\x1B[38;5;196m')
+  usblog_xterm.write(text + '\r\n');
+  if (error) usblog_xterm.write('\x1B[0;0m')
+}
+
+async function detect_connected()
+{
+	const devices = await navigator.usb.getDevices();
+	if (devices.length != 0) {
+	  usb_log_append('Device already connected: ' + devices[0].manufacturerName + ' - ' + devices[0].productName);
+	  webusb_connected.value = true;
+	}
+}
+
+async function load_wasmFPGALoader()
+{
+  usb_log_append('wasmFPGAloader initializing...');
+  Module({
+	onRuntimeInitialized: function(){
+      usb_log_append('wasmFPGAloader loaded.');
+	  wfl_loaded.value = true;
+	},
+	print: function(text) {
+	  usb_log_append(text);
+	},
+	printErr: function(text) {
+	  usb_log_append(text, 1);
+	}
+  }).then((wfll) => {
+	wfl.value = wfll;
+  }).catch((error) => {
+    usb_log_append('wasmFPGAloader loading error: ' + error, 1);
+  });
+}
+
+// WebUSB
+onMounted(() => {
+//  usblog_xterm.value = new Terminal();
+  const fitAddon = new FitAddon();
+  usblog_xterm.loadAddon(fitAddon);
+  usblog_xterm.open(document.getElementById('usblog_xterm'));
+  //usblog_xterm.setOption('padding', { top: 5, left: 0, right: 10, bottom: 5 });
+//  usblog_xterm.write('log..')
+  fitAddon.fit();
+
+  webusb_connected.value = false;
+  wfl_loaded.value = false;
+  if (!navigator.usb) {
+    usb_log_append('ERROR: WebUSB not supported by this browser!', 1);
+    usb_log_append('Please use Chromium-based browsers and access the site with HTTPS', 1);
+	webusb_supported.value = false;
+  } else {
+	webusb_supported.value = true;
+    detect_connected();
+	load_wasmFPGALoader();
+  }
+})
+
+async function forget_all_devices(){
+  const devices = await navigator.usb.getDevices();
+  for (const device of devices) {
+	if (!device.opened) await device.open();
+	await device.reset();
+	await device.close();
+    await device.forget();
+  }
+  usb_log_append('All devices unpaired.');
+  usb_log_append('!!Please refresh page before connect!!', 1);
+  webusb_supported.value = false;
+  // TODO: hijack connect button to refresh
+}
+
+async function connect_usb() {
+  // forget all devices first -- have to do this before libusb can use other 
+  // devices than only the first. 
+  //await forget_all_devices();
+  usb_log_append('Connect a new device...');
+  try {
+    const device = await navigator.usb.requestDevice({ filters: [] });
+    usb_log_append('Device selected: ' + device.manufacturerName + ', ' + device.productName);
+	webusb_connected.value = true;
+  } catch (error) {
+    if (error instanceof DOMException && error.name === 'NotFoundError') {
+      usb_log_append('No device selected.', 1);
+    } else {
+      usb_log_append('Error: ' + error.message, 1);
+    }
+  }
+}
+
+/*
+async function call_wfl(params) {
+  return new Promise(function(resolve) {
+    wfl.value.callMain(params);
+	resolve();
+  });
+}
+*/
+
+async function bit2FS() {
+  try {
+    wfl.value.FS.unlink('/' + bitname.value);
+  } catch (error) {}
+  const url = `${import.meta.env.VITE_HOST}/download/${job_id.value}/bitstream`;
+  try {
+    const response = await fetch(url);
+	if (!response.ok) {
+	  usb_log_append('Error downloading bitstream file from server: ' + response.statusText, 1);
+	}
+	const arrayBuffer = await response.arrayBuffer();
+	const uint8Array = new Uint8Array(arrayBuffer);
+	wfl.value.FS.writeFile('/' + bitname.value, uint8Array);
+	usb_log_append('Bitstream downloaded from server.');
+  } catch (error) {
+    usb_log_append('Failed when downloading bitstream from server: ' + error, 1);
+  }
+}
+
+async function wfl_program(cmd){
+  if (cmd == 'detect') {
+    usb_log_append('Detecting FPGA...');
+	await wfl.value.callMain(['-c', cable_inuse.value, '--detect']);
+	//usb_log_append('Detection done.');
+  }
+  else if (cmd == 'program') {
+    usb_log_append('Programming bitstream to ' + 'SRAM' + '...');
+	await bit2FS();
+	await wfl.value.callMain(['-c', cable_inuse.value, '/' + bitname.value].concat(flash_enabled.value ? ['-f'] : []));
+  }
+}
+
 </script>
 
 <template>
-  <div class="container">
+  <div class="container container-fluid main-container">
     <form method="POST" action="submit" @submit.prevent="submit">
       <div class="row">
-        <div class="btn-group form-group col-md-2 dropdown">
+        <div class="form-group col-md-2 dropdown" style="width: 12.49%">
+          <label>Start here!</label>
           <button
             type="button"
             class="btn btn-danger dropdown-toggle"
@@ -379,7 +542,7 @@ async function fetch_show_log() {
             <a class="dropdown-item" @click="click_me_blank">Reset</a>
           </div>
         </div>
-        <div class="form-group col-md-2">
+        <div class="form-group col-md-2" style="width: 12.49%">
           <label for="inputJobId">Name</label>
           <input
             v-model="job_id_prefix"
@@ -389,7 +552,7 @@ async function fetch_show_log() {
             name="inputJobId"
           />
         </div>
-        <div class="form-group col-md-2">
+        <div class="form-group col-md-2" style="width: 12.49%">
           <label>FPGA Part</label>
           <select id="" class="form-control" name="" v-model="fpga_part">
             <option selected value="auto">Auto ({{ auto_fpga_part }})</option>
@@ -675,7 +838,7 @@ async function fetch_show_log() {
             </optgroup>
           </select>
         </div>
-        <div class="form-group col-md-2">
+        <div class="form-group col-md-2" style="width: 12.49%">
           <label>Backend</label>
           <select id="" class="form-control" name="" v-model="backend">
             <option selected value="auto">Auto ({{ auto_backend }})</option>
@@ -685,7 +848,7 @@ async function fetch_show_log() {
             <option>ecp5</option>
           </select>
         </div>
-        <div class="form-group col-md-2">
+        <div class="form-group col-md-2" style="width: 12.49%">
           <label for="inputTopName">Top Module</label>
           <input
             v-model="top_name"
@@ -695,6 +858,17 @@ async function fetch_show_log() {
             name="inputTopName"
           />
         </div>
+        <div class="form-group col-md-2" style="width: 8%">
+        </div>
+		<div class="form-group col-md-2" style="width: 24.99%">
+	      <label>What mode do you want?</label>
+		  <nav>
+			  <div class="nav nav-pills" id="pills-tab" role="tablist">
+				  <button class="nav-link active" id="nav-editor-tab" data-bs-toggle="tab" data-bs-target="#nav-editor" type="button" role="tab" aria-controls="nav-editor" aria-selected="true">Online Editor</button>
+				  <button class="nav-link" id="nav-editor-tab" data-bs-toggle="tab" data-bs-target="#nav-github" type="button" role="tab" aria-controls="nav-github" aria-selected="false">GitHub Project</button>
+			  </div>
+		  </nav>
+		</div>
       </div>
 	  <!--
 	  <div>
@@ -707,25 +881,57 @@ async function fetch_show_log() {
 		  {{ conf }}
 	  </div>
 	  -->
-      <div class="row">
-        <div class="form-group col-md-6">
-          <label for="inputXdcFile">Constraint file</label>
-          <codemirror
-            v-model="xdc"
-            style="height: 500px; background-color: white"
-            placeholder="Code goes here..."
-          />
-        </div>
-        <div class="form-group col-md-6">
-          <label for="inputSrcFile1">Verilog source file</label>
-          <codemirror
-            v-model="v"
-            style="height: 500px; background-color: white"
-            placeholder="Code goes here..."
-            :extensions="extensions"
-          />
-        </div>
-      </div>
+	  <div class="container tab-content mt-3" id="pills-tabContent" style="background-color: white;">
+		  <div class="tab-pane show active" id="nav-editor" role="tabpanel" aria-labelledby="nav-editor-tab">
+			  <div class="row">
+				<div class="form-group col-md-6">
+				  <label for="inputXdcFile">Constraint file</label>
+				  <codemirror
+					v-model="xdc"
+					style="height: 500px; background-color: white"
+					placeholder="Code goes here..."
+				  />
+				</div>
+				<div class="form-group col-md-6">
+				  <label for="inputSrcFile1">Verilog source file</label>
+				  <codemirror
+					v-model="v"
+					style="height: 500px; background-color: white"
+					placeholder="Code goes here..."
+					:extensions="extensions"
+				  />
+				</div>
+			  </div>
+		  </div>
+		  <div class="tab-pane mt-2" id="nav-github" role="tabpanel" aria-labelledby="nav-github-tab">
+			  <div class="row">
+				  <div class="form-group col-md-6">
+					  <label>GitHub Project URL</label>
+					  <input
+						v-model="github_url"
+						type="url"
+						class="form-control"
+					  />
+				  </div>
+				  <div class="form-group col-md-6">
+					  <label class="form-check-label" for="use_gh_conf">
+						  Use caas.conf from GitHub
+					  </label>
+					  <br>
+					  <input class="form-check-input" type="checkbox" id="use_gh_conf">
+				  </div>
+			  </div>
+			  <div class="form-group mt-2">
+				  <label>Compilation Configuration (caas.conf)</label>
+				  <codemirror
+					v-model="gh_conf"
+					style="height: 300px; background-color: white"
+					placeholder="Code goes here..."
+					:extensions="extensions"
+				  />
+			  </div>
+		  </div>
+	  </div>
       <button
         formtarget="_blank"
         type="submit"
@@ -736,50 +942,97 @@ async function fetch_show_log() {
         Submit
       </button>
     </form>
+    <p class="mt-2" id="server_reply">{{ server_reply }}</p>
   </div>
 
-  <div class="container">
-    <p id="server_reply">{{ server_reply }}</p>
-    <div class="row mb-2">
-      <div class="btn-group bottom-button">
-        <button class="btn btn-primary" :disabled="!log_available" @click="fetch_show_log()">
-          Show Log
-        </button>
-      </div>
-      <div class="btn-group bottom-button">
-        <button class="btn btn-primary" :disabled="!log_available" @click="download('log')">
-          Download Log
-        </button>
-      </div>
-    </div>
-	<div v-if="show_log_section" class="form-group col-md-6">
-		<textarea class="form-control" id="log_textarea"> {{ log_content }}</textarea>
-	  <br>
-	</div>
-    <div class="row mb-2">
-      <div class="btn-group bottom-button">
-        <button
-          class="btn btn-primary"
-          :disabled="!bitstream_available"
-          @click="download('bitstream')"
-        >
-          Download Bitstream
-        </button>
+  <div class="container main-container">
+	  <div class="row">
+		<div class="form-group col-md-6">
+			<div class="row">
+			  <div class="btn-group bottom-button col-md-6">
+				<button class="btn btn-primary" :disabled="!log_available" @click="fetch_show_log()">
+				  Fetch & Show Log
+				</button>
+			  </div>
+			  <div class="btn-group bottom-button col-md-6">
+				<button class="btn btn-primary" :disabled="!log_available" @click="download('log')">
+				  Download Log
+				</button>
+			  </div>
+			</div>
+		    <label>Compilation log</label>
+			<textarea class="form-control" id="log_textarea" readonly>{{ log_content }}</textarea>
+		  <br>
+		</div>
+		<div class="form-group col-md-6">
+			<div class="row mb-1">
+			  <div class="btn-group bottom-button col-md-6">
+				<button
+				  class="btn btn-primary"
+				  :disabled="!bitstream_available | !webusb_connected | !wfl_loaded"
+				  @click="wfl_program('program')"
+				>
+				  Program Bitstream...
+				</button>
+			  </div>
+			  <div class="btn-group bottom-button col-md-6">
+				<button
+				  class="btn btn-primary"
+				  :disabled="!bitstream_available"
+				  @click="download('bitstream')"
+				>
+				  Download Bitstream
+				</button>
+			  </div>
+			</div>
+		    <label>WebUSB programmer log</label>
+				<div class="xterm" id="usblog_xterm"></div>
+			<!--<textarea class="form-control" id="usblog_textarea" readonly> {{ usblog_content }}</textarea>-->
+			<div class="row">
+			  <div class="btn-group usb-button mt-2 col-md-4">
+				<button class="btn btn-primary btn-dark" :disabled="!webusb_supported" @click="connect_usb()">
+				  Connect Local USB
+				</button>
+			  </div>
+			  <div class="btn-group usb-button mt-2 col-md-4">
+				<button class="btn btn-primary btn-dark" :disabled="!webusb_connected | !wfl_loaded" @click="wfl_program('detect')">
+				  Detect FPGA
+				</button>
+			  </div>
+			  <div class="btn-group usb-button mt-2 col-md-4">
+				<button class="btn btn-primary btn-dark" :disabled="!webusb_supported" @click="forget_all_devices()">
+				  Disconnect all USB
+				</button>
+			  </div>
+			  <div class="form-group md-2 col-md-6">
+			    <label>JTAG Cable Type</label>
+		    	<select id="" class="form-control" name="" v-model="cable">
+				  <option selected value="auto">Auto ({{ auto_cable }})</option>
+				  <option value="ft232">ft232</option>
+				  <option value="ft2232">ft2232</option>
+				  <option value="digilent">digilent</option>
+			    </select>
+			  </div>
+			  <div class="form-group col-md-6">
+				  <label class="form-check-label" for="flash_enabled">
+					  Program to Flash
+				  </label>
+				  <br>
+				  <input class="form-check-input" type="checkbox" id="flash_enabled" v-model="flash_enabled">
+			  </div>
+			</div>
+		</div>
 	  </div>
-      <div class="btn-group bottom-button">
-        <button
-          class="btn btn-primary"
-          :disabled="!bitstream_available"
-          @click="d"
-        >
-          Program Bitstream
-        </button>
-      </div>
-    </div>
   </div>
 </template>
 
 <style scoped>
+/*
+.main-container {
+  max-width:1300px;
+}
+*/
+
 .container {
   margin-top: 1rem !important;
 }
@@ -789,10 +1042,18 @@ pre {
 }
 
 textarea.form-control {
-  height: 200px;
-  font-size: 13px;
+  height: 295px;
+  font-size: 14px;
   font-family: SFMono-Regular, Menlo, Monaco, Consolas, monospace;
+  color: white;
+  background-color: black;
 }
+
+/*
+codemirror {
+	background-color: white;
+}
+*/
 
 .subtitle {
   color: gray;
@@ -810,6 +1071,16 @@ textarea.form-control {
 
 .bottom-button {
   margin-bottom: 8px;
-  width: 300px;
+
+}
+.usb-button {
+  margin-bottom: 8px;
+
+}
+
+.xterm {
+	height: 100%;
+	max-height: 300px;
+	box-sizing: border-box;
 }
 </style>
