@@ -25,24 +25,27 @@ const auto_backend = ref('')
 const bkend_inuse = computed(() => {return backend.value == 'auto' ? auto_backend.value : backend.value})
 const v = ref('')
 const xdc = ref('')
-const gh_conf = ref('')
+const github_url = ref('')
 const bitname = computed(() => {return bkend_inuse.value == 'gowin' ? 'top.fs' : 'top.bit'})
 const conf = computed(() => {return `[project]
 Backend = ${bkend_inuse.value}
 Part = ${part_inuse.value}
 Top = ${top_name.value}
-Sources = *.v
-Constraints = *.xdc
 Bitname = ${bitname.value}
 `})
+const gh_conf = computed(() => {return conf.value + `Giturl = ${github_url.value}`})
+const use_gh_conf = ref('')
+window.ugc = use_gh_conf
+const gh_conf_name = ref('')
 
-const github_url = ref('')
+github_url.value = ""
+gh_conf_name.value = "caas.conf"
 
 const webusb_supported = ref('')
 const webusb_connected = ref('')
 const wfl_loaded = ref('')
 const log_content = ref('')
-const usblog_content = ref('')
+//const usblog_content = ref('')
 const usblog_xterm = new Terminal({
   fontFamily: 'SFMono-Regular, Menlo, Monaco, Consolas, monospace',
   fontSize: 14
@@ -905,28 +908,42 @@ async function wfl_program(cmd){
 		  </div>
 		  <div class="tab-pane mt-2" id="nav-github" role="tabpanel" aria-labelledby="nav-github-tab">
 			  <div class="row">
-				  <div class="form-group col-md-6">
+				  <div class="form-group col-md-6 mb-2">
 					  <label>GitHub Project URL</label>
 					  <input
-						v-model="github_url"
 						type="url"
+						v-model="github_url"
 						class="form-control"
 					  />
 				  </div>
-				  <div class="form-group col-md-6">
+				  <div class="form-group col-md-2">
 					  <label class="form-check-label" for="use_gh_conf">
-						  Use caas.conf from GitHub
+						  Use existing config file
 					  </label>
 					  <br>
-					  <input class="form-check-input" type="checkbox" id="use_gh_conf">
+					  <input class="form-check-input" type="checkbox" id="use_gh_conf" v-model="use_gh_conf">
+				  </div>
+				  <div v-if="use_gh_conf" class="form-group col-md-2">
+					  <label class="form-check-label" for="use_gh_conf">
+						  Config file name
+					  </label>
+					  <br>
+					  <input
+						v-model="gh_conf_name"
+						type="text"
+						class="form-control"
+					  />
 				  </div>
 			  </div>
-			  <div class="form-group mt-2">
-				  <label>Compilation Configuration (caas.conf)</label>
+			  <div v-if="!use_gh_conf" class="form-group mt-2 col-md-6">
+				  <label>Custom Compilation Configuration</label>
+			      <textarea v-model="gh_conf" class="form-control gh_conf" id="gh_conf_textarea" readonly></textarea>
 				  <codemirror
-					v-model="gh_conf"
-					style="height: 300px; background-color: white"
-					placeholder="Code goes here..."
+					v-model="gh_conf_ext"
+					style="height: 200px; background-color: white;"
+					placeholder="Add your extra config...
+Sources = *.v, rtl/*.v
+Constraint = *.xdc, *.lpf, *.cst"
 					:extensions="extensions"
 				  />
 			  </div>
@@ -1042,11 +1059,17 @@ pre {
 }
 
 textarea.form-control {
-  height: 295px;
+  height: 419px;
   font-size: 14px;
   font-family: SFMono-Regular, Menlo, Monaco, Consolas, monospace;
   color: white;
   background-color: black;
+}
+
+textarea.gh_conf {
+	height: 140px;
+    color: black;
+    background-color: white;
 }
 
 /*
