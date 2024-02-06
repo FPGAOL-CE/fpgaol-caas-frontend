@@ -23,9 +23,12 @@ const part_inuse = computed(() => {return fpga_part.value == 'auto' ? auto_fpga_
 const backend = ref('')
 const auto_backend = ref('')
 const bkend_inuse = computed(() => {return backend.value == 'auto' ? auto_backend.value : backend.value})
+
+const activeTab = ref('editor')
+window.activeTab = activeTab
+
 const v = ref('')
 const xdc = ref('')
-const github_url = ref('')
 const bitname = computed(() => {return bkend_inuse.value == 'gowin' ? 'top.fs' : 'top.bit'})
 const conf = computed(() => {return `[project]
 Backend = ${bkend_inuse.value}
@@ -33,13 +36,11 @@ Part = ${part_inuse.value}
 Top = ${top_name.value}
 Bitname = ${bitname.value}
 `})
+const github_url = ref('')
 const gh_conf = computed(() => {return conf.value + `Giturl = ${github_url.value}`})
+const gh_conf_ext = ref('')
 const use_gh_conf = ref('')
-window.ugc = use_gh_conf
-const gh_conf_name = ref('')
-
-github_url.value = ""
-gh_conf_name.value = "caas.conf"
+const gh_conf_name = ref('caas.conf')
 
 const webusb_supported = ref('')
 const webusb_connected = ref('')
@@ -50,14 +51,11 @@ const usblog_xterm = new Terminal({
   fontFamily: 'SFMono-Regular, Menlo, Monaco, Consolas, monospace',
   fontSize: 14
 })
-const cable = ref('')
-const auto_cable = ref('')
+const cable = ref('auto')
+const auto_cable = ref('ft2232')
 const flash_enabled = ref('')
 const cable_inuse = computed(() => {return cable.value == 'auto' ? auto_cable.value : cable.value})
 const wfl = ref('')
-
-cable.value = 'auto';
-auto_cable.value = 'ft2232';
 
 window.Module = Module;
 window.wfl = wfl;
@@ -158,18 +156,18 @@ function poll() {
 function submit() {
   job_id_bare.value = new_job_id()
   job_id.value = job_id_prefix.value + '_' + job_id_bare.value
-  conf.value = ''
   axios.post(
     import.meta.env.VITE_HOST + '/submit',
     new URLSearchParams({
       inputJobId: job_id.value,
-      inputXdcFile: xdc.value,
-      inputSrcFile: v.value,
-	  inputConfFile: conf.value,
+	  inputNoSource: activeTab.value == 'editor' ? '0' : '1',
+      inputXdcFile: activeTab.value == 'editor' ? xdc.value : '',
+      inputSrcFile: activeTab.value == 'editor' ? v.value : '',
+	  inputConfFile: activeTab.value == 'editor' ? conf.value : (gh_conf.value + '\n' + gh_conf_ext.value)
       // we keep the backward compatibility
-      inputFpgaPart: fpga_part.value,
-      inputSrcFile1: v.value, 
-      inputTopName: top_name.value
+//      inputFpgaPart: fpga_part.value,
+//      inputSrcFile1: v.value, 
+//      inputTopName: top_name.value
     })
   )
   polling.value = true
@@ -867,23 +865,12 @@ async function wfl_program(cmd){
 	      <label>What mode do you want?</label>
 		  <nav>
 			  <div class="nav nav-pills" id="pills-tab" role="tablist">
-				  <button class="nav-link active" id="nav-editor-tab" data-bs-toggle="tab" data-bs-target="#nav-editor" type="button" role="tab" aria-controls="nav-editor" aria-selected="true">Online Editor</button>
-				  <button class="nav-link" id="nav-editor-tab" data-bs-toggle="tab" data-bs-target="#nav-github" type="button" role="tab" aria-controls="nav-github" aria-selected="false">GitHub Project</button>
+				  <button class="nav-link active" id="nav-editor-tab" data-bs-toggle="tab" data-bs-target="#nav-editor" type="button" role="tab" aria-controls="nav-editor" aria-selected="true" @click="activeTab='editor'">Online Editor</button>
+				  <button class="nav-link" id="nav-editor-tab" data-bs-toggle="tab" data-bs-target="#nav-github" type="button" role="tab" aria-controls="nav-github" aria-selected="false" @click="activeTab='github'">GitHub Project</button>
 			  </div>
 		  </nav>
 		</div>
       </div>
-	  <!--
-	  <div>
-		  {{ auto_fpga_part }}
-		  {{ auto_backend }}
-		  <br>
-		  {{ fpga_part }}
-		  {{ backend }}
-		  <br>
-		  {{ conf }}
-	  </div>
-	  -->
 	  <div class="container tab-content mt-3" id="pills-tabContent" style="background-color: white;">
 		  <div class="tab-pane show active" id="nav-editor" role="tabpanel" aria-labelledby="nav-editor-tab">
 			  <div class="row">
