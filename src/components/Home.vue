@@ -114,6 +114,17 @@ function click_me(repo, path, xdc_name, v_name, device, bend, top, jobidname) {
   job_id_prefix.value = jobidname
 }
 
+function click_me_github(url, urlconf, device, bend, top, jobidname) {
+  github_url.value = url
+  use_gh_conf.value = !urlconf == ''
+  backend.value = 'auto'
+  auto_backend.value = bend
+  fpga_part.value = 'auto'
+  auto_fpga_part.value = device
+  top_name.value = top
+  job_id_prefix.value = jobidname
+}
+
 const polling = ref(false)
 const timeout = 3000 // query interval
 const bitstream_available = ref(false)
@@ -397,6 +408,7 @@ async function wfl_program(cmd){
               >FPGAOL2(for guests)</a
             >
             <a
+              v-if="activeTab == 'editor'"
               class="dropdown-item"
               @click="
                 click_me(
@@ -413,6 +425,7 @@ async function wfl_program(cmd){
               >Digilent Basys 3 -- blinky</a
             >
             <a
+              v-if="activeTab == 'editor'"
               class="dropdown-item"
               @click="
                 click_me(
@@ -429,6 +442,7 @@ async function wfl_program(cmd){
               >Digilent Arty 35t -- blinky</a
             >
             <a
+              v-if="activeTab == 'editor'"
               class="dropdown-item"
               @click="
                 click_me(
@@ -445,6 +459,7 @@ async function wfl_program(cmd){
               >Digilent Arty 100t -- blinky</a
             >
             <a
+              v-if="activeTab == 'editor'"
               class="dropdown-item"
               @click="
                 click_me(
@@ -461,6 +476,7 @@ async function wfl_program(cmd){
               >QMTech Kintex 7 -- blinky</a
             >
             <a
+              v-if="activeTab == 'editor'"
               class="dropdown-item"
               @click="
                 click_me(
@@ -477,6 +493,7 @@ async function wfl_program(cmd){
               >Digilent Genesys 2 -- blinky</a
             >
             <a
+              v-if="activeTab == 'editor'"
               class="dropdown-item"
               @click="
                 click_me(
@@ -493,6 +510,7 @@ async function wfl_program(cmd){
               >Tang Nano 9K -- blinky</a
             >
             <a
+              v-if="activeTab == 'editor'"
               class="dropdown-item"
               @click="
                 click_me(
@@ -509,6 +527,7 @@ async function wfl_program(cmd){
               >Tang Nano 9K -- HDMI</a
             >
             <a
+              v-if="activeTab == 'editor'"
               class="dropdown-item"
               @click="
                 click_me(
@@ -525,6 +544,7 @@ async function wfl_program(cmd){
               >Icebreaker -- rgbled</a
             >
             <a
+              v-if="activeTab == 'editor'"
               class="dropdown-item"
               @click="
                 click_me(
@@ -539,6 +559,21 @@ async function wfl_program(cmd){
                 )
               "
               >ULX3S -- blinky</a
+            >
+            <a
+              v-if="activeTab == 'github'"
+              class="dropdown-item"
+              @click="
+                click_me_github(
+                  'https://github.com/Juninho99/FPGAOL-Caas-Tangnano9k-Test/pulls',
+                  '',
+                  'GW1NR-LV9QN88PC6\\\/I5',
+				  'gowin',
+                  'Lab1',
+                  'tangnano9k_github'
+                )
+              "
+              >Tang Nano 9K -- button_led</a
             >
             <a class="dropdown-item" @click="click_me_blank">Reset</a>
           </div>
