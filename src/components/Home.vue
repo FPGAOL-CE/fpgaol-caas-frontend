@@ -360,7 +360,8 @@ async function wfl_program(cmd){
 <template>
   <div class="container container-fluid main-container">
     <form method="POST" action="submit" @submit.prevent="submit">
-      <div class="row">
+      <a class="mt-2" style="color:red" href="https://github.com/FPGAOL-CE/caas-wizard/blob/main/docs/CaaS%20User%20Guide.md" target="_blank">Need help? See the documents.</a>
+      <div class="row mt-2">
         <div class="form-group col-md-2 dropdown" style="width: 12.49%">
           <label>Start here!</label>
           <button
