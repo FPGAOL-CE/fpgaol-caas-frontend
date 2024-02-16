@@ -37,16 +37,19 @@ Top = ${top_name.value}
 Bitname = ${bitname.value}
 `})
 const github_url = ref('')
-const gh_conf = computed(() => {return conf.value + `Giturl = ${github_url.value}`})
-const gh_conf_ext = ref('')
 const use_gh_conf = ref('')
+const gh_conf_ext = ref('')
 const gh_conf_name = ref('caas.conf')
+const gh_conf = computed(() => {return conf.value + `
+Giturl = ${github_url.value}
+Usegitconf = ${use_gh_conf.value}
+Gitconf = ${gh_conf_name.value}
+` + gh_conf_ext.value})
 
 const webusb_supported = ref('')
 const webusb_connected = ref('')
 const wfl_loaded = ref('')
 const log_content = ref('')
-//const usblog_content = ref('')
 const usblog_xterm = new Terminal({
   fontFamily: 'SFMono-Regular, Menlo, Monaco, Consolas, monospace',
   fontSize: 14
