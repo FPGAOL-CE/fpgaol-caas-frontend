@@ -10,8 +10,9 @@ import { StreamLanguage } from '@codemirror/language'
 import { verilog } from '@codemirror/legacy-modes/mode/verilog'
 import Module from '/public/wasmFPGAloader_lite.js';
 import axios from 'axios'
+import { globalVersion } from '@/router'
 
-const version = ref(import.meta.env.VITE_VERSION)
+const version = globalVersion
 
 const job_id_prefix = ref('')
 const job_id_bare = ref('')
@@ -467,6 +468,23 @@ async function wfl_program(cmd){
               class="dropdown-item"
               @click="
                 click_me(
+                  'FPGAOL-CE/user-examples',
+                  'a7lite',
+                  'a7lite.xdc',
+                  'top.v',
+                  'xc7a100tfgg484-1',
+				  'openxc7',
+                  'top',
+                  'a7lite100t'
+                )
+              "
+              >MicroPhase A7Lite 100t -- blinky</a
+            >
+            <a
+              v-if="activeTab == 'editor'"
+              class="dropdown-item"
+              @click="
+                click_me(
                   'openxc7/demo-projects',
                   'blinky-qmtech',
                   'blinky.xdc',
@@ -565,11 +583,28 @@ async function wfl_program(cmd){
               >ULX3S -- blinky</a
             >
             <a
+              v-if="activeTab == 'editor'"
+              class="dropdown-item"
+              @click="
+                click_me(
+                  'FPGAOL-CE/user-examples',
+                  'ulx3s',
+                  'ulx3s_v20.lpf',
+                  'blinky.v',
+                  'lfe5u-85f-cabga381',
+				  'ecp5',
+                  'top',
+                  'ulx3s'
+                )
+              "
+              >ULX3S(85F) -- blinky</a
+            >
+            <a
               v-if="activeTab == 'github'"
               class="dropdown-item"
               @click="
                 click_me_github(
-                  'https://github.com/Juninho99/FPGAOL-Caas-Tangnano9k-Test/pulls',
+                  'https://github.com/Juninho99/FPGAOL-Caas-Tangnano9k-Test',
                   '',
                   'GW1NR-LV9QN88PC6\\\/I5',
 				  'gowin',
@@ -578,6 +613,36 @@ async function wfl_program(cmd){
                 )
               "
               >Tang Nano 9K -- button_led</a
+            >
+            <a
+              v-if="activeTab == 'github'"
+              class="dropdown-item"
+              @click="
+                click_me_github(
+                  'https://github.com/FPGAOL-CE/user-examples/tree/main/ulx3s',
+                  '',
+                  'lfe5u-25f-cabga381',
+				  'ecp5',
+                  'top',
+                  'ulx3s_github'
+                )
+              "
+              >ULX3S -- blinky</a
+            >
+            <a
+              v-if="activeTab == 'github'"
+              class="dropdown-item"
+              @click="
+                click_me_github(
+                  'https://github.com/FPGAOL-CE/user-examples/tree/main/ulx3s',
+                  '',
+                  'lfe5u-85f-cabga381',
+				  'ecp5',
+                  'top',
+                  'ulx3s_github'
+                )
+              "
+              >ULX3S(85F) -- blinky</a
             >
             <a class="dropdown-item" @click="click_me_blank">Reset</a>
           </div>

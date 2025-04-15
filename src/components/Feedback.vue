@@ -1,7 +1,9 @@
 <script setup>
 import { ref } from 'vue'
 import axios from 'axios'
-const version = ref(import.meta.env.VITE_VERSION)
+import { globalVersion } from '@/router'
+
+const version = globalVersion
 const fb_contact = ref('')
 const fb_content = ref('')
 const feedback_reply = ref('')
@@ -26,7 +28,7 @@ function send_fb() {
 <template>
   <div class="container">
     <div class="row justify-content-start">
-      <div class="form-group col-md-5">
+      <!-- <div class="form-group col-md-5">
         <label for="fb_content">Content</label>
         <textarea
           class="form-control"
@@ -36,8 +38,8 @@ function send_fb() {
           rows="8"
         ></textarea>
       </div>
-      <div class="w-100"></div>
-      <div class="form-group col-md-5">
+      <div class="w-100"></div> -->
+      <!-- <div class="form-group col-md-5">
         <label for="fb_contact" class="mt-1">Contact(optional)</label>
         <input
           v-model="fb_contact"
@@ -46,14 +48,17 @@ function send_fb() {
           name="fb_contact"
           id="fb_contact"
         />
-      </div>
-      <div class="w-100"></div>
+      </div> -->
+      <!-- <div class="w-100"></div>
       <div class="form-group col-md-5">
         <button class="btn btn-primary mt-3 submit-button" @click="send_fb()">Send feedback</button>
       </div>
       <div class="w-100"></div>
       <div class="form-group col-md-5">
         <p class="mt-3" id="feedback_reply">{{ feedback_reply }}</p>
+      </div> -->
+      <div class="form-group col-md-5">
+        <a href="mailto:ustcymgu@gmail.com?subject=Feedback for SymbioticEDA CaaS&body=Hi, I have the following feedback for SymbioticEDA CaaS..." class="btn btn-primary mt-3 submit-button">Send feedback</a>
       </div>
     </div>
   </div>
