@@ -17,7 +17,7 @@ export default defineConfig({
 	  viteStaticCopy({ targets: [
 		  { src: 'public/wasmFPGAloader_lite.js', dest: 'public' },
 		  { src: 'public/wasmFPGAloader_lite.wasm', dest: 'public' }
-	  ] }) 
+	  ] })
   ],
   server: {
     host: 'localhost',

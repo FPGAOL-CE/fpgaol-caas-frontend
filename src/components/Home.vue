@@ -2,7 +2,7 @@
 import { Codemirror } from 'vue-codemirror'
 import { ref } from 'vue'
 import { computed } from 'vue'
-import { onMounted } from 'vue'
+import { onMounted, watch } from 'vue'
 import { Terminal } from 'xterm'
 import { FitAddon } from 'xterm-addon-fit'
 import 'xterm/css/xterm.css'
@@ -30,6 +30,8 @@ window.activeTab = activeTab
 
 const v = ref('')
 const xdc = ref('')
+const sim = ref('')
+const mode = ref('bitstream') // 'bitstream' or 'simulation'
 const bitname = computed(() => {return bkend_inuse.value == 'gowin' ? 'top.fs' : 'top.bit'})
 const conf = computed(() => {return `[project]
 Backend = ${bkend_inuse.value}
@@ -61,6 +63,8 @@ const flash_enabled = ref('')
 const cable_inuse = computed(() => {return cable.value == 'auto' ? auto_cable.value : cable.value})
 const wfl = ref('')
 
+const surferUrl = '/surfer/index.html';
+
 window.Module = Module;
 window.wfl = wfl;
 
@@ -71,6 +75,17 @@ window.conf = conf
 
 const extensions = [StreamLanguage.define(verilog)]
 
+// Watch for mode changes to initialize Surfer viewer when switching to simulation mode
+// should run this only once when the page is loaded, but maybe this can reduce page loading time?
+watch(mode, (newMode) => {
+  if (newMode === 'simulation') {
+    // Initialize Surfer viewer when switching to simulation mode
+    setTimeout(() => {
+      initializeSurferViewer();
+    }, 5)
+  }
+})
+
 function new_job_id() {
   return Math.round(Math.random() * 8388607 + 8388608).toString(16)
 }
@@ -78,6 +93,7 @@ function new_job_id() {
 function click_me_blank() {
   v.value = ''
   xdc.value = ''
+  sim.value = ''
   auto_fpga_part.value = ''
   fpga_part.value = 'auto'
   auto_backend.value = ''
@@ -86,6 +102,13 @@ function click_me_blank() {
   job_id_bare.value = new_job_id()
   job_id_prefix.value = ''
   cable.value = 'auto'
+  mode.value = 'bitstream'
+  server_reply.value = 'No reply from server.'
+  server_reply_sim.value = 'No reply from server.'
+  simulation_available.value = false
+  simulation_log_content.value = ''
+  waveform_data.value = ''
+  waveform_loaded.value = false
 }
 
 function click_me(repo, path, xdc_name, v_name, device, bend, top, jobidname) {
@@ -133,9 +156,14 @@ const polling = ref(false)
 const timeout = 3000 // query interval
 const bitstream_available = ref(false)
 const log_available = ref(false)
+const simulation_available = ref(false)
+const simulation_log_content = ref('')
+const waveform_data = ref('')
+const waveform_loaded = ref(false)
 
 const animarr = ['/', '-', '\\', '|']
 const server_reply = ref('No reply from server.')
+const server_reply_sim = ref('No reply from server.')
 let cntr = 0
 
 function poll() {
@@ -146,24 +174,43 @@ function poll() {
       // now we handle each possible response explicitly, and stop(let user submit again) immediately after vague things happened
       if (data.includes('finished')) {
         console.log('Done!')
-        if (data.includes('succeeded')) {
-          bitstream_available.value = true
+        if (mode.value === 'bitstream') {
+          if (data.includes('succeeded')) {
+            bitstream_available.value = true
+          }
+          log_available.value = true
+          server_reply.value = data
+        } else {
+          if (data.includes('succeeded')) {
+            simulation_available.value = true
+          }
+          server_reply_sim.value = data
         }
-        log_available.value = true
-        server_reply.value = data
         polling.value = false
       } else {
         if (!data.includes('running') && !data.includes('pending')) {
-          server_reply.value = 'Compiling went wrong, please try again: ' + '\t' + data + ', are some files empty or entries missing?'
+          if (mode.value === 'bitstream') {
+            server_reply.value = 'Compiling went wrong, please try again: ' + '\t' + data + ', are some files empty or entries missing?'
+          } else {
+            server_reply_sim.value = 'Simulation went wrong, please try again: ' + '\t' + data + ', are some files empty or entries missing?'
+          }
           polling.value = false
         } else {
-          server_reply.value = animarr[cntr++ % 4] + '\t' + data
+          if (mode.value === 'bitstream') {
+            server_reply.value = animarr[cntr++ % 4] + '\t' + data
+          } else {
+            server_reply_sim.value = animarr[cntr++ % 4] + '\t' + data
+          }
           window.setTimeout(poll, timeout)
         }
       }
     })
     .catch(({ err }) => {
-      server_reply.value = 'Error communicating with server, please try again: ' + '\t' + err
+      if (mode.value === 'bitstream') {
+        server_reply.value = 'Error communicating with server, please try again: ' + '\t' + err
+      } else {
+        server_reply_sim.value = 'Error communicating with server, please try again: ' + '\t' + err
+      }
       polling.value = false
     })
 }
@@ -171,33 +218,34 @@ function poll() {
 function submit() {
   job_id_bare.value = new_job_id()
   job_id.value = job_id_prefix.value + '_' + job_id_bare.value
+  
+  const postData = {
+    inputJobId: job_id.value,
+    inputNoSource: activeTab.value == 'editor' ? '0' : '1',
+    inputSrcFile: activeTab.value == 'editor' ? v.value : '',
+    inputConfFile: activeTab.value == 'editor' ? conf.value : (gh_conf.value + '\n' + gh_conf_ext.value)
+  }
+  
+  if (mode.value === 'bitstream') {
+    postData.inputXdcFile = activeTab.value == 'editor' ? xdc.value : ''
+  } else {
+    postData.inputSimFile = activeTab.value == 'editor' ? sim.value : ''
+  }
+  
   axios.post(
     import.meta.env.VITE_HOST + '/submit',
-    new URLSearchParams({
-      inputJobId: job_id.value,
-	  inputNoSource: activeTab.value == 'editor' ? '0' : '1',
-      inputXdcFile: activeTab.value == 'editor' ? xdc.value : '',
-      inputSrcFile: activeTab.value == 'editor' ? v.value : '',
-	  inputConfFile: activeTab.value == 'editor' ? conf.value : (gh_conf.value + '\n' + gh_conf_ext.value)
-      // we keep the backward compatibility
-//      inputFpgaPart: fpga_part.value,
-//      inputSrcFile1: v.value, 
-//      inputTopName: top_name.value
-    })
+    new URLSearchParams(postData)
   )
   polling.value = true
-  bitstream_available.value = false
-  log_available.value = false
+  
+  if (mode.value === 'bitstream') {
+    bitstream_available.value = false
+    log_available.value = false
+  } else {
+    simulation_available.value = false
+  }
+  
   window.setTimeout(poll, timeout)
-  // // here has a timing hazard: should do the post HERE and wait for finish
-  // // before ispolling = true
-  // if (!polllaunched.value) {
-  //   polllaunched.value = true
-  //   // this is the first launch of poll
-  // }
-  // polling.value = true
-  // download_available.value = false
-  // log_available.value = false
 }
 
 function download(filetype) {
@@ -223,6 +271,54 @@ async function fetch_show_log() {
   } catch (error) {
 	console.error('Error fetching log:', error);
 	log_content.value = 'Error fetching log.';
+  }
+}
+
+async function fetch_show_simulation_results() {
+  simulation_log_content.value = 'Fetching simulation results...';
+  waveform_data.value = 'Fetching waveform data...';
+  
+  // Fetch simulation log
+  const logUrl = `${import.meta.env.VITE_HOST}/download/${job_id.value}/sim_log`;
+  try {
+    const logResponse = await fetch(logUrl);
+	if (logResponse.ok) {
+	  const logText = await logResponse.text();
+	  simulation_log_content.value = logText;
+	  setTimeout(() => {
+	    const textarea = document.getElementById('simulation_log_textarea');
+        textarea.scrollTop = textarea.scrollHeight; // Scroll to bottom
+	  }, 0);
+	} else {
+	  console.error('Failed to fetch simulation log.');
+	  simulation_log_content.value = 'Failed to fetch simulation log.';
+	}
+  } catch (error) {
+	console.error('Error fetching simulation log:', error);
+	simulation_log_content.value = 'Error fetching simulation log.';
+  }
+  
+  // Fetch waveform data
+  const waveformUrl = `${import.meta.env.VITE_HOST}/download/${job_id.value}/waveform`;
+  try {
+    const waveformResponse = await fetch(waveformUrl);
+	if (waveformResponse.ok) {
+	  const waveformText = await waveformResponse.text();
+	  waveform_data.value = waveformText;
+	  waveform_loaded.value = true;
+	  // Update Surfer viewer with new data
+	  setTimeout(() => {
+	    initializeSurferViewer();
+	  }, 100);
+	} else {
+	  console.error('Failed to fetch waveform data.');
+	  waveform_data.value = 'Failed to fetch waveform data.';
+	  waveform_loaded.value = false;
+	}
+  } catch (error) {
+	console.error('Error fetching waveform data:', error);
+	waveform_data.value = 'Error fetching waveform data.';
+	waveform_loaded.value = false;
   }
 }
 
@@ -359,14 +455,59 @@ async function wfl_program(cmd){
   }
 }
 
+function openLocalSurferViewer() {
+  // If we have waveform data, create a blob URL and open Surfer with it
+  if (waveform_data.value && waveform_data.value !== 'Failed to fetch waveform data.' && waveform_data.value !== 'Error fetching waveform data.' && waveform_data.value !== 'Fetching waveform data...') {
+    const blob = new Blob([waveform_data.value], { type: 'text/plain' });
+    const blobUrl = URL.createObjectURL(blob);
+    surferUrl = `/surfer/?url=${encodeURIComponent(blobUrl)}`;
+  }
+  
+  // Open Surfer in a new tab
+  window.open(surferUrl, '_blank');
+}
+
+function initializeSurferViewer() {
+  const viewerElement = document.getElementById('surfer-viewer');
+  if (!viewerElement) {
+    return;
+  }
+  
+  // Check if iframe already exists
+  let iframe = viewerElement.querySelector('iframe');
+  
+  if (!iframe) {
+    // Create Surfer viewer iframe only if it doesn't exist
+    iframe = document.createElement('iframe');
+    iframe.style.width = '100%';
+    iframe.style.height = '400px';
+    iframe.style.border = '1px solid #ccc';
+    iframe.style.borderRadius = '4px';
+    viewerElement.appendChild(iframe);
+  }
+  
+  // Update iframe src if we have new waveform data
+  if (waveform_data.value && waveform_data.value !== 'Failed to fetch waveform data.' && waveform_data.value !== 'Error fetching waveform data.' && waveform_data.value !== 'Fetching waveform data...') {
+    // Create a blob URL for the VCD data
+    const blob = new Blob([waveform_data.value], { type: 'text/plain' });
+    const blobUrl = URL.createObjectURL(blob);
+    
+    // Set up Surfer viewer URL with the VCD data
+    iframe.src = `${surferUrl}?url=${encodeURIComponent(blobUrl)}`;
+  } else if (!iframe.src || iframe.src === 'about:blank') {
+    // Only set src if it's not already set
+    iframe.src = surferUrl;
+  }
+}
 </script>
 
 <template>
   <div class="container container-fluid main-container">
     <form method="POST" action="submit" @submit.prevent="submit">
       <a class="mt-2" style="color:red" href="https://github.com/FPGAOL-CE/caas-wizard/blob/main/docs/CaaS%20User%20Guide.md" target="_blank">Need help? See the documents.</a>
+      <a class="mt-2 ms-4" style="color:red" href="https://github.com/FPGAOL-CE/fpgaol-caas-frontend/issues" target="_blank">Issues?</a>
       <div class="row mt-2">
-        <div class="form-group col-md-2 dropdown" style="width: 12.49%">
+        <div class="form-group col-md-2 dropdown" style="width: 9.99%">
           <label>Start here!</label>
           <button
             type="button"
@@ -507,7 +648,7 @@ async function wfl_program(cmd){
                   'blinky.xdc',
                   'blinky.v',
                   'xc7k325tffg900-2',
-				  'openxc7',
+				          'openxc7',
                   'blinky',
                   'genesys2'
                 )
@@ -524,7 +665,7 @@ async function wfl_program(cmd){
                   'tangnano9k.cst',
                   'blinky.v',
                   'GW1NR-LV9QN88PC6\\\/I5',
-				  'gowin',
+				          'gowin',
                   'top',
                   'tangnano9k'
                 )
@@ -541,7 +682,7 @@ async function wfl_program(cmd){
                   'hdmi.cst',
                   'fpga4fun_hdmi_test.v',
                   'GW1NR-LV9QN88PC6\\\/I5',
-				  'gowin',
+				          'gowin',
                   'HDMI_test',
                   'tangnano9k'
                 )
@@ -554,11 +695,28 @@ async function wfl_program(cmd){
               @click="
                 click_me(
                   'FPGAOL-CE/user-examples',
+                  'tangnano20k',
+                  'tangnano20k.cst',
+                  'blinky.v',
+                  'GW2AR-LV18QN88C8\\\/I7',
+				          'gowin',
+                  'top',
+                  'tangnano20k'
+                )
+              "
+              >Tang Nano 20K -- blinky</a
+            >
+            <a
+              v-if="activeTab == 'editor'"
+              class="dropdown-item"
+              @click="
+                click_me(
+                  'FPGAOL-CE/user-examples',
                   'icebreaker',
                   'icebreaker.pcf',
                   'pwm.v',
                   'ice40up5k-sg48',
-				  'ice40',
+				          'ice40',
                   'top',
                   'icebreaker'
                 )
@@ -575,7 +733,7 @@ async function wfl_program(cmd){
                   'ulx3s_v20.lpf',
                   'blinky.v',
                   'lfe5u-25f-cabga381',
-				  'ecp5',
+				          'ecp5',
                   'top',
                   'ulx3s'
                 )
@@ -592,7 +750,7 @@ async function wfl_program(cmd){
                   'ulx3s_v20.lpf',
                   'blinky.v',
                   'lfe5u-85f-cabga381',
-				  'ecp5',
+				          'ecp5',
                   'top',
                   'ulx3s'
                 )
@@ -607,12 +765,12 @@ async function wfl_program(cmd){
                   'https://github.com/Juninho99/FPGAOL-Caas-Tangnano9k-Test',
                   '',
                   'GW1NR-LV9QN88PC6\\\/I5',
-				  'gowin',
+				          'gowin',
                   'Lab1',
                   'tangnano9k_github'
                 )
               "
-              >Tang Nano 9K -- button_led</a
+              >Tang Nano 9K -- button_led GitHub</a
             >
             <a
               v-if="activeTab == 'github'"
@@ -622,12 +780,12 @@ async function wfl_program(cmd){
                   'https://github.com/FPGAOL-CE/user-examples/tree/main/ulx3s',
                   '',
                   'lfe5u-25f-cabga381',
-				  'ecp5',
+				          'ecp5',
                   'top',
                   'ulx3s_github'
                 )
               "
-              >ULX3S -- blinky</a
+              >ULX3S -- blinky GitHub</a
             >
             <a
               v-if="activeTab == 'github'"
@@ -637,17 +795,17 @@ async function wfl_program(cmd){
                   'https://github.com/FPGAOL-CE/user-examples/tree/main/ulx3s',
                   '',
                   'lfe5u-85f-cabga381',
-				  'ecp5',
+				        'ecp5',
                   'top',
                   'ulx3s_github'
                 )
               "
-              >ULX3S(85F) -- blinky</a
+              >ULX3S(85F) -- blinky GitHub</a
             >
             <a class="dropdown-item" @click="click_me_blank">Reset</a>
           </div>
         </div>
-        <div class="form-group col-md-2" style="width: 12.49%">
+        <div class="form-group col-md-2" style="width: 9.99%">
           <label for="inputJobId">Name</label>
           <input
             v-model="job_id_prefix"
@@ -657,293 +815,294 @@ async function wfl_program(cmd){
             name="inputJobId"
           />
         </div>
-        <div class="form-group col-md-2" style="width: 12.49%">
+        <div class="form-group col-md-2" style="width: 9.99%">
           <label>FPGA Part</label>
           <select id="" class="form-control" name="" v-model="fpga_part">
             <option selected value="auto">Auto ({{ auto_fpga_part }})</option>
-			<optgroup label="Lattice ICE40">
-				<option>iCE40-HX1K-CB132</option>
-				<option>iCE40-HX1K-TQ144</option>
-				<option>iCE40-HX1K-VQ100</option>
-				<option>iCE40-HX4K-BG121</option>
-				<option>iCE40-HX4K-CB132</option>
-				<option>iCE40-HX4K-TQ144</option>
-				<option>iCE40-HX8K-BG121</option>
-				<option>iCE40-HX8K-CB132</option>
-				<option>iCE40-HX8K-CM225</option>
-				<option>iCE40-HX8K-CT256</option>
-				<option>iCE40-LP1K-CB121</option>
-				<option>iCE40-LP1K-CB81</option>
-				<option>iCE40-LP1K-CM121</option>
-				<option>iCE40-LP1K-CM36</option>
-				<option>iCE40-LP1K-CM49</option>
-				<option>iCE40-LP1K-CM81</option>
-				<option>iCE40-LP1K-QN84</option>
-				<option>iCE40-LP1K-SWG16</option>
-				<option>iCE40-LP384-CM36</option>
-				<option>iCE40-LP384-CM49</option>
-				<option>iCE40-LP384-QN32</option>
-				<option>iCE40-LP4K-CM121</option>
-				<option>iCE40-LP4K-CM225</option>
-				<option>iCE40-LP4K-CM81</option>
-				<option>iCE40-LP8K-CM121</option>
-				<option>iCE40-LP8K-CM225</option>
-				<option>iCE40-LP8K-CM81</option>
-				<option>iCE40-UP3K-UWG30</option>
-				<option>iCE40-UP5K-SG48</option>
-				<option>iCE40-UP5K-UWG30</option>
-            </optgroup>
-			<optgroup label="Lattice ECP5">
-				<option>lfe5u-12f-cabga256</option>
-				<option>lfe5u-12f-cabga381</option>
-				<option>lfe5u-12f-csfgba285</option>
-				<option>lfe5u-12f-tqfp144</option>
+              <optgroup label="Lattice ICE40">
+                <option>iCE40-HX1K-CB132</option>
+                <option>iCE40-HX1K-TQ144</option>
+                <option>iCE40-HX1K-VQ100</option>
+                <option>iCE40-HX4K-BG121</option>
+                <option>iCE40-HX4K-CB132</option>
+                <option>iCE40-HX4K-TQ144</option>
+                <option>iCE40-HX8K-BG121</option>
+                <option>iCE40-HX8K-CB132</option>
+                <option>iCE40-HX8K-CM225</option>
+                <option>iCE40-HX8K-CT256</option>
+                <option>iCE40-LP1K-CB121</option>
+                <option>iCE40-LP1K-CB81</option>
+                <option>iCE40-LP1K-CM121</option>
+                <option>iCE40-LP1K-CM36</option>
+                <option>iCE40-LP1K-CM49</option>
+                <option>iCE40-LP1K-CM81</option>
+                <option>iCE40-LP1K-QN84</option>
+                <option>iCE40-LP1K-SWG16</option>
+                <option>iCE40-LP384-CM36</option>
+                <option>iCE40-LP384-CM49</option>
+                <option>iCE40-LP384-QN32</option>
+                <option>iCE40-LP4K-CM121</option>
+                <option>iCE40-LP4K-CM225</option>
+                <option>iCE40-LP4K-CM81</option>
+                <option>iCE40-LP8K-CM121</option>
+                <option>iCE40-LP8K-CM225</option>
+                <option>iCE40-LP8K-CM81</option>
+                <option>iCE40-UP3K-UWG30</option>
+                <option>iCE40-UP5K-SG48</option>
+                <option>iCE40-UP5K-UWG30</option>
+              </optgroup>
+              <optgroup label="Lattice ECP5">
+                <option>lfe5u-12f-cabga256</option>
+                <option>lfe5u-12f-cabga381</option>
+                <option>lfe5u-12f-csfgba285</option>
+                <option>lfe5u-12f-tqfp144</option>
 
-				<option>lfe5u-25f-cabga256</option>
-				<option>lfe5u-25f-cabga381</option>
-				<option>lfe5u-25f-csfgba285</option>
-				<option>lfe5u-25f-tqfp144</option>
+                <option>lfe5u-25f-cabga256</option>
+                <option>lfe5u-25f-cabga381</option>
+                <option>lfe5u-25f-csfgba285</option>
+                <option>lfe5u-25f-tqfp144</option>
 
-				<option>lfe5u-45f-cabga256</option>
-				<option>lfe5u-45f-cabga381</option>
-				<option>lfe5u-45f-cabga554</option>
-				<option>lfe5u-45f-csfgba285</option>
-				<option>lfe5u-45f-tqfp144</option>
+                <option>lfe5u-45f-cabga256</option>
+                <option>lfe5u-45f-cabga381</option>
+                <option>lfe5u-45f-cabga554</option>
+                <option>lfe5u-45f-csfgba285</option>
+                <option>lfe5u-45f-tqfp144</option>
 
-				<option>lfe5u-85f-cabga381</option>
-				<option>lfe5u-85f-cabga554</option>
-				<option>lfe5u-85f-cabga756</option>
-				<option>lfe5u-85f-csfgba285</option>
+                <option>lfe5u-85f-cabga381</option>
+                <option>lfe5u-85f-cabga554</option>
+                <option>lfe5u-85f-cabga756</option>
+                <option>lfe5u-85f-csfgba285</option>
 
-				<option>lfe5um-25f-cabga256</option>
-				<option>lfe5um-25f-cabga381</option>
-				<option>lfe5um-25f-csfgba285</option>
+                <option>lfe5um-25f-cabga256</option>
+                <option>lfe5um-25f-cabga381</option>
+                <option>lfe5um-25f-csfgba285</option>
 
-				<option>lfe5um-45f-cabga256</option>
-				<option>lfe5um-45f-cabga381</option>
-				<option>lfe5um-45f-cabga554</option>
-				<option>lfe5um-45f-csfgba285</option>
+                <option>lfe5um-45f-cabga256</option>
+                <option>lfe5um-45f-cabga381</option>
+                <option>lfe5um-45f-cabga554</option>
+                <option>lfe5um-45f-csfgba285</option>
 
-				<option>lfe5um-85f-cabga381</option>
-				<option>lfe5um-85f-cabga554</option>
-				<option>lfe5um-85f-cabga756</option>
-				<option>lfe5um-85f-csfgba285</option>
+                <option>lfe5um-85f-cabga381</option>
+                <option>lfe5um-85f-cabga554</option>
+                <option>lfe5um-85f-cabga756</option>
+                <option>lfe5um-85f-csfgba285</option>
 
-				<option>lfe5um5g-25f-cabga256</option>
-				<option>lfe5um5g-25f-cabga381</option>
-				<option>lfe5um5g-25f-csfgba285</option>
+                <option>lfe5um5g-25f-cabga256</option>
+                <option>lfe5um5g-25f-cabga381</option>
+                <option>lfe5um5g-25f-csfgba285</option>
 
-				<option>lfe5um5g-45f-cabga256</option>
-				<option>lfe5um5g-45f-cabga381</option>
-				<option>lfe5um5g-45f-cabga554</option>
-				<option>lfe5um5g-45f-csfgba285</option>
+                <option>lfe5um5g-45f-cabga256</option>
+                <option>lfe5um5g-45f-cabga381</option>
+                <option>lfe5um5g-45f-cabga554</option>
+                <option>lfe5um5g-45f-csfgba285</option>
 
-				<option>lfe5um5g-85f-cabga381</option>
-				<option>lfe5um5g-85f-cabga554</option>
-				<option>lfe5um5g-85f-cabga756</option>
-				<option>lfe5um5g-85f-csfgba285</option>
-            </optgroup>
-			<optgroup label="GOWIN">
-				<option value="GW1NZ-LV1QN48C6\/I5">GW1NZ-LV1QN48C6/I5 (Tang Nano 1K)</option>
-				<option value="GW1NSR-LV4CQN48PC7\/I6">GW1NSR-LV4CQN48PC7/I6 (Tang Nano 4K)</option>
-				<option value="GW1NR-LV9QN88PC6\/I5">GW1NR-LV9QN88PC6/I5 (Tang Nano 9K)</option>
-				<option value="GW1NR-LV9QN88C6\/I5">GW1NR-LV9QN88C6/I5 (TEC0117)</option>
-				<option value="GW2A-LV18PG256C8\/I7">GW2A-LV18PG256C8/I7 (Primer 20K)</option>
-				<option value="GW1N-UV4LQ144C6\/I5">GW1N-UV4LQ144C6/I5 (Gowin Runber)</option>
-				<option value="GW1N-LV1QN48C6\/I5">GW1N-LV1QN48C6/I5 (Original Tang Nano)</option>
-				<option value="GW1NS-UX2CQN48C5\/I4">GW1NS-UX2CQN48C5/I4 (honeycomb)</option>
-            </optgroup>
-            <optgroup label="Xilinx 7 Series">
-				<option disabled>Spartan 7</option>
-				<option>xc7s50ftgb196-1</option>
-				<option>xc7s50ftgb196-1IL</option>
-				<option>xc7s50ftgb196-2</option>
-				<option>xc7s50csga324-1</option>
-				<option>xc7s50csga324-1IL</option>
-				<option>xc7s50csga324-2</option>
-				<option>xc7s50fgga484-1</option>
-				<option>xc7s50fgga484-1IL</option>
-				<option>xc7s50fgga484-2</option>
-				<option disabled>Artix 7</option>
-				<option>xc7a100tcsg324-1</option>
-				<option>xc7a100tcsg324-2</option>
-				<option>xc7a100tcsg324-2L</option>
-				<option>xc7a100tcsg324-3</option>
-				<option>xc7a100tfgg484-1</option>
-				<option>xc7a100tfgg484-2</option>
-				<option>xc7a100tfgg484-2L</option>
-				<option>xc7a100tfgg484-3</option>
-				<option>xc7a100tfgg676-1</option>
-				<option>xc7a100tfgg676-2</option>
-				<option>xc7a100tfgg676-2L</option>
-				<option>xc7a100tfgg676-3</option>
-				<option>xc7a100tftg256-1</option>
-				<option>xc7a100tftg256-2</option>
-				<option>xc7a100tftg256-2L</option>
-				<option>xc7a100tftg256-3</option>
-				<option>xc7a200tfbg484-1</option>
-				<option>xc7a200tfbg484-2</option>
-				<option>xc7a200tfbg484-2L</option>
-				<option>xc7a200tfbg484-3</option>
-				<option>xc7a200tfbg676-1</option>
-				<option>xc7a200tfbg676-2</option>
-				<option>xc7a200tfbg676-2L</option>
-				<option>xc7a200tfbg676-3</option>
-				<option>xc7a200tfbv484-1</option>
-				<option>xc7a200tfbv484-2</option>
-				<option>xc7a200tfbv484-2L</option>
-				<option>xc7a200tfbv484-3</option>
-				<option>xc7a200tfbv676-1</option>
-				<option>xc7a200tfbv676-2</option>
-				<option>xc7a200tfbv676-2L</option>
-				<option>xc7a200tfbv676-3</option>
-				<option>xc7a200tffg1156-1</option>
-				<option>xc7a200tffg1156-2</option>
-				<option>xc7a200tffg1156-2L</option>
-				<option>xc7a200tffg1156-3</option>
-				<option>xc7a200tffv1156-1</option>
-				<option>xc7a200tffv1156-2</option>
-				<option>xc7a200tffv1156-2L</option>
-				<option>xc7a200tffv1156-3</option>
-				<option>xc7a200tsbg484-1</option>
-				<option>xc7a200tsbg484-2</option>
-				<option>xc7a200tsbg484-2L</option>
-				<option>xc7a200tsbg484-3</option>
-				<option>xc7a200tsbv484-1</option>
-				<option>xc7a200tsbv484-2</option>
-				<option>xc7a200tsbv484-2L</option>
-				<option>xc7a200tsbv484-3</option>
-				<option>xc7a35tcpg236-1</option>
-				<option>xc7a35tcpg236-2</option>
-				<option>xc7a35tcpg236-2L</option>
-				<option>xc7a35tcpg236-3</option>
-				<option>xc7a35tcsg324-1</option>
-				<option>xc7a35tcsg324-2</option>
-				<option>xc7a35tcsg324-2L</option>
-				<option>xc7a35tcsg324-3</option>
-				<option>xc7a35tcsg325-1</option>
-				<option>xc7a35tcsg325-2</option>
-				<option>xc7a35tcsg325-2L</option>
-				<option>xc7a35tcsg325-3</option>
-				<option>xc7a35tfgg484-1</option>
-				<option>xc7a35tfgg484-2</option>
-				<option>xc7a35tfgg484-2L</option>
-				<option>xc7a35tfgg484-3</option>
-				<option>xc7a35tftg256-1</option>
-				<option>xc7a35tftg256-2</option>
-				<option>xc7a35tftg256-2L</option>
-				<option>xc7a35tftg256-3</option>
-				<option>xc7a50tcpg236-1</option>
-				<option>xc7a50tcpg236-2</option>
-				<option>xc7a50tcpg236-2L</option>
-				<option>xc7a50tcpg236-3</option>
-				<option>xc7a50tcsg324-1</option>
-				<option>xc7a50tcsg324-2</option>
-				<option>xc7a50tcsg324-2L</option>
-				<option>xc7a50tcsg324-3</option>
-				<option>xc7a50tcsg325-1</option>
-				<option>xc7a50tcsg325-2</option>
-				<option>xc7a50tcsg325-2L</option>
-				<option>xc7a50tcsg325-3</option>
-				<option>xc7a50tfgg484-1</option>
-				<option>xc7a50tfgg484-2</option>
-				<option>xc7a50tfgg484-2L</option>
-				<option>xc7a50tfgg484-3</option>
-				<option>xc7a50tftg256-1</option>
-				<option>xc7a50tftg256-2</option>
-				<option>xc7a50tftg256-2L</option>
-				<option>xc7a50tftg256-3</option>
-				<option disabled>Kintex 7</option>
-				<option>xc7k160tfbg484-2</option>
-				<option>xc7k160tfbg484-2L</option>
-				<option>xc7k160tfbg484-3</option>
-				<option>xc7k160tfbg676-1</option>
-				<option>xc7k160tfbg676-2</option>
-				<option>xc7k160tfbg676-2L</option>
-				<option>xc7k160tfbg676-3</option>
-				<option>xc7k160tfbv484-1</option>
-				<option>xc7k160tfbv484-2</option>
-				<option>xc7k160tfbv484-2L</option>
-				<option>xc7k160tfbv484-3</option>
-				<option>xc7k160tfbv676-1</option>
-				<option>xc7k160tfbv676-2</option>
-				<option>xc7k160tfbv676-2L</option>
-				<option>xc7k160tfbv676-3</option>
-				<option>xc7k160tffg676-1</option>
-				<option>xc7k160tffg676-2</option>
-				<option>xc7k160tffg676-2L</option>
-				<option>xc7k160tffg676-3</option>
-				<option>xc7k160tffv676-1</option>
-				<option>xc7k160tffv676-2</option>
-				<option>xc7k160tffv676-2L</option>
-				<option>xc7k160tffv676-3</option>
-				<option>xc7k325tffg676-1</option>
-				<option>xc7k325tffg900-2</option>
-				<option>xc7k420tffg1156-1</option>
-				<option>xc7k420tffg1156-2</option>
-				<option>xc7k420tffg1156-2L</option>
-				<option>xc7k420tffg1156-3</option>
-				<option>xc7k420tffg901-1</option>
-				<option>xc7k420tffg901-2</option>
-				<option>xc7k420tffg901-2L</option>
-				<option>xc7k420tffg901-3</option>
-				<option>xc7k420tffv1156-1</option>
-				<option>xc7k420tffv1156-2</option>
-				<option>xc7k420tffv1156-2L</option>
-				<option>xc7k420tffv1156-3</option>
-				<option>xc7k420tffv901-1</option>
-				<option>xc7k420tffv901-2</option>
-				<option>xc7k420tffv901-2L</option>
-				<option>xc7k420tffv901-3</option>
-				<option>xc7k480tffg1156-1</option>
-				<option>xc7k480tffg1156-2</option>
-				<option>xc7k480tffg1156-2L</option>
-				<option>xc7k480tffg1156-3</option>
-				<option>xc7k480tffg901-1</option>
-				<option>xc7k480tffg901-2</option>
-				<option>xc7k480tffg901-2L</option>
-				<option>xc7k480tffg901-3</option>
-				<option>xc7k480tffv1156-1</option>
-				<option>xc7k480tffv1156-2</option>
-				<option>xc7k480tffv1156-2L</option>
-				<option>xc7k480tffv1156-3</option>
-				<option>xc7k480tffv901-1</option>
-				<option>xc7k480tffv901-2</option>
-				<option>xc7k480tffv901-2L</option>
-				<option>xc7k480tffv901-3</option>
-				<option>xc7k70tfbg484-1</option>
-				<option>xc7k70tfbg484-2</option>
-				<option>xc7k70tfbg484-2L</option>
-				<option>xc7k70tfbg484-3</option>
-				<option>xc7k70tfbg676-1</option>
-				<option>xc7k70tfbg676-2</option>
-				<option>xc7k70tfbg676-2L</option>
-				<option>xc7k70tfbg676-3</option>
-				<option>xc7k70tfbv484-1</option>
-				<option>xc7k70tfbv484-2</option>
-				<option>xc7k70tfbv484-2L</option>
-				<option>xc7k70tfbv484-3</option>
-				<option>xc7k70tfbv676-1</option>
-				<option>xc7k70tfbv676-2</option>
-				<option>xc7k70tfbv676-2L</option>
-				<option>xc7k70tfbv676-3</option>
-				<option disabled>Zynq 7</option>
-				<option>xc7z010clg225-1</option>
-				<option>xc7z010clg225-2</option>
-				<option>xc7z010clg225-3</option>
-				<option>xc7z010clg400-1</option>
-				<option>xc7z010clg400-2</option>
-				<option>xc7z010clg400-3</option>
-				<option>xc7z020clg400-1</option>
-				<option>xc7z020clg400-2</option>
-				<option>xc7z020clg400-3</option>
-				<option>xc7z020clg484-1</option>
-				<option>xc7z020clg484-2</option>
-				<option>xc7z020clg484-3</option>
-            </optgroup>
+                <option>lfe5um5g-85f-cabga381</option>
+                <option>lfe5um5g-85f-cabga554</option>
+                <option>lfe5um5g-85f-cabga756</option>
+                <option>lfe5um5g-85f-csfgba285</option>
+              </optgroup>
+              <optgroup label="GOWIN">
+                <option value="GW1NZ-LV1QN48C6\/I5">GW1NZ-LV1QN48C6/I5 (Tang Nano 1K)</option>
+                <option value="GW1NSR-LV4CQN48PC7\/I6">GW1NSR-LV4CQN48PC7/I6 (Tang Nano 4K)</option>
+                <option value="GW1NR-LV9QN88PC6\/I5">GW1NR-LV9QN88PC6/I5 (Tang Nano 9K)</option>
+                <option value="GW2AR-LV18QN88C8\/I7">GW2AR-LV18QN88C8/I7 (Tang Nano 20K)</option>
+                <option value="GW1NR-LV9QN88C6\/I5">GW1NR-LV9QN88C6/I5 (TEC0117)</option>
+                <option value="GW2A-LV18PG256C8\/I7">GW2A-LV18PG256C8/I7 (Primer 20K)</option>
+                <option value="GW1N-UV4LQ144C6\/I5">GW1N-UV4LQ144C6/I5 (Gowin Runber)</option>
+                <option value="GW1N-LV1QN48C6\/I5">GW1N-LV1QN48C6/I5 (Original Tang Nano)</option>
+                <option value="GW1NS-UX2CQN48C5\/I4">GW1NS-UX2CQN48C5/I4 (honeycomb)</option>
+              </optgroup>
+              <optgroup label="Xilinx 7 Series">
+                <option disabled>Spartan 7</option>
+                <option>xc7s50ftgb196-1</option>
+                <option>xc7s50ftgb196-1IL</option>
+                <option>xc7s50ftgb196-2</option>
+                <option>xc7s50csga324-1</option>
+                <option>xc7s50csga324-1IL</option>
+                <option>xc7s50csga324-2</option>
+                <option>xc7s50fgga484-1</option>
+                <option>xc7s50fgga484-1IL</option>
+                <option>xc7s50fgga484-2</option>
+                <option disabled>Artix 7</option>
+                <option>xc7a100tcsg324-1</option>
+                <option>xc7a100tcsg324-2</option>
+                <option>xc7a100tcsg324-2L</option>
+                <option>xc7a100tcsg324-3</option>
+                <option>xc7a100tfgg484-1</option>
+                <option>xc7a100tfgg484-2</option>
+                <option>xc7a100tfgg484-2L</option>
+                <option>xc7a100tfgg484-3</option>
+                <option>xc7a100tfgg676-1</option>
+                <option>xc7a100tfgg676-2</option>
+                <option>xc7a100tfgg676-2L</option>
+                <option>xc7a100tfgg676-3</option>
+                <option>xc7a100tftg256-1</option>
+                <option>xc7a100tftg256-2</option>
+                <option>xc7a100tftg256-2L</option>
+                <option>xc7a100tftg256-3</option>
+                <option>xc7a200tfbg484-1</option>
+                <option>xc7a200tfbg484-2</option>
+                <option>xc7a200tfbg484-2L</option>
+                <option>xc7a200tfbg484-3</option>
+                <option>xc7a200tfbg676-1</option>
+                <option>xc7a200tfbg676-2</option>
+                <option>xc7a200tfbg676-2L</option>
+                <option>xc7a200tfbg676-3</option>
+                <option>xc7a200tfbv484-1</option>
+                <option>xc7a200tfbv484-2</option>
+                <option>xc7a200tfbv484-2L</option>
+                <option>xc7a200tfbv484-3</option>
+                <option>xc7a200tfbv676-1</option>
+                <option>xc7a200tfbv676-2</option>
+                <option>xc7a200tfbv676-2L</option>
+                <option>xc7a200tfbv676-3</option>
+                <option>xc7a200tffg1156-1</option>
+                <option>xc7a200tffg1156-2</option>
+                <option>xc7a200tffg1156-2L</option>
+                <option>xc7a200tffg1156-3</option>
+                <option>xc7a200tffv1156-1</option>
+                <option>xc7a200tffv1156-2</option>
+                <option>xc7a200tffv1156-2L</option>
+                <option>xc7a200tffv1156-3</option>
+                <option>xc7a200tsbg484-1</option>
+                <option>xc7a200tsbg484-2</option>
+                <option>xc7a200tsbg484-2L</option>
+                <option>xc7a200tsbg484-3</option>
+                <option>xc7a200tsbv484-1</option>
+                <option>xc7a200tsbv484-2</option>
+                <option>xc7a200tsbv484-2L</option>
+                <option>xc7a200tsbv484-3</option>
+                <option>xc7a35tcpg236-1</option>
+                <option>xc7a35tcpg236-2</option>
+                <option>xc7a35tcpg236-2L</option>
+                <option>xc7a35tcpg236-3</option>
+                <option>xc7a35tcsg324-1</option>
+                <option>xc7a35tcsg324-2</option>
+                <option>xc7a35tcsg324-2L</option>
+                <option>xc7a35tcsg324-3</option>
+                <option>xc7a35tcsg325-1</option>
+                <option>xc7a35tcsg325-2</option>
+                <option>xc7a35tcsg325-2L</option>
+                <option>xc7a35tcsg325-3</option>
+                <option>xc7a35tfgg484-1</option>
+                <option>xc7a35tfgg484-2</option>
+                <option>xc7a35tfgg484-2L</option>
+                <option>xc7a35tfgg484-3</option>
+                <option>xc7a35tftg256-1</option>
+                <option>xc7a35tftg256-2</option>
+                <option>xc7a35tftg256-2L</option>
+                <option>xc7a35tftg256-3</option>
+                <option>xc7a50tcpg236-1</option>
+                <option>xc7a50tcpg236-2</option>
+                <option>xc7a50tcpg236-2L</option>
+                <option>xc7a50tcpg236-3</option>
+                <option>xc7a50tcsg324-1</option>
+                <option>xc7a50tcsg324-2</option>
+                <option>xc7a50tcsg324-2L</option>
+                <option>xc7a50tcsg324-3</option>
+                <option>xc7a50tcsg325-1</option>
+                <option>xc7a50tcsg325-2</option>
+                <option>xc7a50tcsg325-2L</option>
+                <option>xc7a50tcsg325-3</option>
+                <option>xc7a50tfgg484-1</option>
+                <option>xc7a50tfgg484-2</option>
+                <option>xc7a50tfgg484-2L</option>
+                <option>xc7a50tfgg484-3</option>
+                <option>xc7a50tftg256-1</option>
+                <option>xc7a50tftg256-2</option>
+                <option>xc7a50tftg256-2L</option>
+                <option>xc7a50tftg256-3</option>
+                <option disabled>Kintex 7</option>
+                <option>xc7k160tfbg484-2</option>
+                <option>xc7k160tfbg484-2L</option>
+                <option>xc7k160tfbg484-3</option>
+                <option>xc7k160tfbg676-1</option>
+                <option>xc7k160tfbg676-2</option>
+                <option>xc7k160tfbg676-2L</option>
+                <option>xc7k160tfbg676-3</option>
+                <option>xc7k160tfbv484-1</option>
+                <option>xc7k160tfbv484-2</option>
+                <option>xc7k160tfbv484-2L</option>
+                <option>xc7k160tfbv484-3</option>
+                <option>xc7k160tfbv676-1</option>
+                <option>xc7k160tfbv676-2</option>
+                <option>xc7k160tfbv676-2L</option>
+                <option>xc7k160tfbv676-3</option>
+                <option>xc7k160tffg676-1</option>
+                <option>xc7k160tffg676-2</option>
+                <option>xc7k160tffg676-2L</option>
+                <option>xc7k160tffg676-3</option>
+                <option>xc7k160tffv676-1</option>
+                <option>xc7k160tffv676-2</option>
+                <option>xc7k160tffv676-2L</option>
+                <option>xc7k160tffv676-3</option>
+                <option>xc7k325tffg676-1</option>
+                <option>xc7k325tffg900-2</option>
+                <option>xc7k420tffg1156-1</option>
+                <option>xc7k420tffg1156-2</option>
+                <option>xc7k420tffg1156-2L</option>
+                <option>xc7k420tffg1156-3</option>
+                <option>xc7k420tffg901-1</option>
+                <option>xc7k420tffg901-2</option>
+                <option>xc7k420tffg901-2L</option>
+                <option>xc7k420tffg901-3</option>
+                <option>xc7k420tffv1156-1</option>
+                <option>xc7k420tffv1156-2</option>
+                <option>xc7k420tffv1156-2L</option>
+                <option>xc7k420tffv1156-3</option>
+                <option>xc7k420tffv901-1</option>
+                <option>xc7k420tffv901-2</option>
+                <option>xc7k420tffv901-2L</option>
+                <option>xc7k420tffv901-3</option>
+                <option>xc7k480tffg1156-1</option>
+                <option>xc7k480tffg1156-2</option>
+                <option>xc7k480tffg1156-2L</option>
+                <option>xc7k480tffg1156-3</option>
+                <option>xc7k480tffg901-1</option>
+                <option>xc7k480tffg901-2</option>
+                <option>xc7k480tffg901-2L</option>
+                <option>xc7k480tffg901-3</option>
+                <option>xc7k480tffv1156-1</option>
+                <option>xc7k480tffv1156-2</option>
+                <option>xc7k480tffv1156-2L</option>
+                <option>xc7k480tffv1156-3</option>
+                <option>xc7k480tffv901-1</option>
+                <option>xc7k480tffv901-2</option>
+                <option>xc7k480tffv901-2L</option>
+                <option>xc7k480tffv901-3</option>
+                <option>xc7k70tfbg484-1</option>
+                <option>xc7k70tfbg484-2</option>
+                <option>xc7k70tfbg484-2L</option>
+                <option>xc7k70tfbg484-3</option>
+                <option>xc7k70tfbg676-1</option>
+                <option>xc7k70tfbg676-2</option>
+                <option>xc7k70tfbg676-2L</option>
+                <option>xc7k70tfbg676-3</option>
+                <option>xc7k70tfbv484-1</option>
+                <option>xc7k70tfbv484-2</option>
+                <option>xc7k70tfbv484-2L</option>
+                <option>xc7k70tfbv484-3</option>
+                <option>xc7k70tfbv676-1</option>
+                <option>xc7k70tfbv676-2</option>
+                <option>xc7k70tfbv676-2L</option>
+                <option>xc7k70tfbv676-3</option>
+                <option disabled>Zynq 7</option>
+                <option>xc7z010clg225-1</option>
+                <option>xc7z010clg225-2</option>
+                <option>xc7z010clg225-3</option>
+                <option>xc7z010clg400-1</option>
+                <option>xc7z010clg400-2</option>
+                <option>xc7z010clg400-3</option>
+                <option>xc7z020clg400-1</option>
+                <option>xc7z020clg400-2</option>
+                <option>xc7z020clg400-3</option>
+                <option>xc7z020clg484-1</option>
+                <option>xc7z020clg484-2</option>
+                <option>xc7z020clg484-3</option>
+              </optgroup>
           </select>
         </div>
-        <div class="form-group col-md-2" style="width: 12.49%">
+        <div class="form-group col-md-2" style="width: 9.99%">
           <label>Backend</label>
           <select id="" class="form-control" name="" v-model="backend">
             <option selected value="auto">Auto ({{ auto_backend }})</option>
@@ -953,7 +1112,7 @@ async function wfl_program(cmd){
             <option>ecp5</option>
           </select>
         </div>
-        <div class="form-group col-md-2" style="width: 12.49%">
+        <div class="form-group col-md-2" style="width: 9.99%">
           <label for="inputTopName">Top Module</label>
           <input
             v-model="top_name"
@@ -963,10 +1122,19 @@ async function wfl_program(cmd){
             name="inputTopName"
           />
         </div>
-        <div class="form-group col-md-2" style="width: 8%">
-        </div>
-		<div class="form-group col-md-2" style="width: 24.99%">
-	      <label>What mode do you want?</label>
+        <!-- <div class="form-group col-md-2" style="width: 8%">
+        </div> -->
+		<div class="form-group col-md-2" style="width: 18.49%">
+	      <label>Real or sim?</label>
+		  <nav>
+			  <div class="nav nav-pills" id="mode-tab" role="tablist">
+				  <button class="nav-link mode-nav-link" :class="{ active: mode === 'bitstream' }" type="button" @click="mode='bitstream'">Bitstream</button>
+				  <button class="nav-link mode-nav-link" :class="{ active: mode === 'simulation' }" type="button" @click="mode='simulation'">Simulation</button>
+			  </div>
+		  </nav>
+		</div>
+		<div class="form-group col-md-2" style="width: 22.49%">
+	      <label>Code here or elsewhere?</label>
 		  <nav>
 			  <div class="nav nav-pills" id="pills-tab" role="tablist">
 				  <button class="nav-link active" id="nav-editor-tab" data-bs-toggle="tab" data-bs-target="#nav-editor" type="button" role="tab" aria-controls="nav-editor" aria-selected="true" @click="activeTab='editor'">Online Editor</button>
@@ -979,11 +1147,20 @@ async function wfl_program(cmd){
 		  <div class="tab-pane show active" id="nav-editor" role="tabpanel" aria-labelledby="nav-editor-tab">
 			  <div class="row">
 				<div class="form-group col-md-6">
-				  <label for="inputXdcFile">Constraint file</label>
+				  <label v-if="mode === 'bitstream'" for="inputXdcFile">Constraint file</label>
+				  <label v-else for="inputSimFile">Simulation file</label>
 				  <codemirror
+					v-if="mode === 'bitstream'"
 					v-model="xdc"
-					style="height: 500px; background-color: white"
-					placeholder="Code goes here..."
+					style="height: 500px; background-color: #fff4f4"
+					placeholder="Constraint goes here..."
+				  />
+				  <codemirror
+					v-else
+					v-model="sim"
+					style="height: 500px; background-color: #f8fff8"
+					placeholder="Simulation goes here..."
+					:extensions="extensions"
 				  />
 				</div>
 				<div class="form-group col-md-6">
@@ -991,7 +1168,7 @@ async function wfl_program(cmd){
 				  <codemirror
 					v-model="v"
 					style="height: 500px; background-color: white"
-					placeholder="Code goes here..."
+					placeholder="Verilog source goes here..."
 					:extensions="extensions"
 				  />
 				</div>
@@ -1047,13 +1224,15 @@ Constraint = *.xdc, *.lpf, *.cst"
         id="submitbutton"
         :disabled="polling"
       >
-        Submit
+        {{ mode === 'bitstream' ? 'Submit' : 'Submit Simulation' }}
       </button>
     </form>
-    <p class="mt-2" id="server_reply">{{ server_reply }}</p>
+    <p class="mt-2" id="server_reply" v-if="mode === 'bitstream'">{{ server_reply }}</p>
+    <p class="mt-2" id="server_reply_sim" v-else>{{ server_reply_sim }}</p>
   </div>
 
-  <div class="container main-container">
+  <!-- Bitstream Mode Bottom Section -->
+  <div v-show="mode === 'bitstream'" class="container main-container">
 	  <div class="row">
 		<div class="form-group col-md-6">
 			<div class="row">
@@ -1093,8 +1272,10 @@ Constraint = *.xdc, *.lpf, *.cst"
 				</button>
 			  </div>
 			</div>
-		    <label>WebUSB programmer log</label>
-				<div class="xterm" id="usblog_xterm"></div>
+      <div class="row">
+        <label>WebUSB programmer log</label>
+        <div class="xterm" id="usblog_xterm"></div>
+      </div>
 			<!--<textarea class="form-control" id="usblog_textarea" readonly> {{ usblog_content }}</textarea>-->
 			<div class="row">
 			  <div class="btn-group usb-button mt-2 col-md-4">
@@ -1131,6 +1312,45 @@ Constraint = *.xdc, *.lpf, *.cst"
 			</div>
 		</div>
 	  </div>
+  </div>
+
+  <!-- Simulation Mode Bottom Section -->
+  <div v-show="mode === 'simulation'" class="container main-container">
+    <div class="row">
+      <div class="btn-group bottom-button col-md-3">
+      <button class="btn btn-primary" :disabled="!simulation_available" @click="fetch_show_simulation_results()">
+        Fetch & Show Results
+      </button>
+      </div>
+      <div class="btn-group bottom-button col-md-3">
+      <button class="btn btn-primary" :disabled="!simulation_available" @click="download('sim_log')">
+        Download Log
+      </button>
+      </div>
+      <div class="btn-group bottom-button col-md-3">
+      <button class="btn btn-primary" :disabled="!simulation_available" @click="download('waveform')">
+        Download Waveform
+      </button>
+      </div>
+      <div class="btn-group bottom-button col-md-3">
+      <button class="btn btn-secondary" @click="openLocalSurferViewer()">
+        Open Surfer
+      </button>
+      </div>
+		</div>
+	  <div class="row">
+      <div class="form-group col-md-6">
+		    <label>Simulation log</label>
+        <textarea class="form-control" id="simulation_log_textarea" readonly>{{ simulation_log_content }}</textarea>
+      </div>
+      <div class="form-group col-md-6">
+        <label>Waveform Viewer (Surfer)</label>
+        <div id="surfer-viewer" class="waveform-container">
+          <!-- Surfer viewer will be loaded here -->
+        </div>
+      </div>
+	  </div>
+    <br>
   </div>
 </template>
 
@@ -1196,5 +1416,29 @@ codemirror {
 	height: 100%;
 	max-height: 300px;
 	box-sizing: border-box;
+}
+
+.waveform-container {
+  height: 400px;
+  border: 1px solid #ccc;
+  border-radius: 4px;
+  background-color: #f8f9fa;
+}
+
+.mode-nav-link {
+  color: #198754 !important;
+  /* border: 1px solid #198754 !important; */
+  /* background-color: transparent !important; */
+}
+
+/* .mode-nav-link:hover {
+  color: white !important;
+  background-color: #198754 !important;
+} */
+
+.mode-nav-link.active {
+  color: white !important;
+  background-color: #198754 !important;
+  /* border-color: #198754 !important; */
 }
 </style>
