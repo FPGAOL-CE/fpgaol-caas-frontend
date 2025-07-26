@@ -63,7 +63,7 @@ const flash_enabled = ref('')
 const cable_inuse = computed(() => {return cable.value == 'auto' ? auto_cable.value : cable.value})
 const wfl = ref('')
 
-const surferUrl = '/surfer/index.html';
+const surferUrl = '/surfer-viewer/';
 
 window.Module = Module;
 window.wfl = wfl;
@@ -109,6 +109,7 @@ function click_me_blank() {
   simulation_log_content.value = ''
   waveform_data.value = ''
   waveform_loaded.value = false
+  log_content.value = ''
 }
 
 function click_me(repo, path, xdc_name, v_name, device, bend, top, jobidname) {
@@ -180,11 +181,15 @@ function poll() {
           }
           log_available.value = true
           server_reply.value = data
+          // Fetch final log
+          fetch_log_during_polling(false)
         } else {
           if (data.includes('succeeded')) {
             simulation_available.value = true
           }
           server_reply_sim.value = data
+          // Fetch final simulation log
+          fetch_log_during_polling(true)
         }
         polling.value = false
       } else {
@@ -198,8 +203,12 @@ function poll() {
         } else {
           if (mode.value === 'bitstream') {
             server_reply.value = animarr[cntr++ % 4] + '\t' + data
+            // Fetch log during compilation
+            fetch_log_during_polling(false)
           } else {
             server_reply_sim.value = animarr[cntr++ % 4] + '\t' + data
+            // Fetch simulation log during simulation
+            fetch_log_during_polling(true)
           }
           window.setTimeout(poll, timeout)
         }
@@ -241,8 +250,10 @@ function submit() {
   if (mode.value === 'bitstream') {
     bitstream_available.value = false
     log_available.value = false
+    log_content.value = 'Waiting for compilation log...\n'
   } else {
     simulation_available.value = false
+    simulation_log_content.value = 'Waiting for simulation log...\n'
   }
   
   window.setTimeout(poll, timeout)
@@ -274,6 +285,35 @@ async function fetch_show_log() {
   }
 }
 
+async function fetch_log_during_polling(isSimulation = false) {
+  if (!polling.value || !job_id.value) return;
+  
+  const logType = isSimulation ? 'sim_log' : 'log';
+  const url = `${import.meta.env.VITE_HOST}/download/${job_id.value}/${logType}`;
+  const textareaId = isSimulation ? 'simulation_log_textarea' : 'log_textarea';
+  
+  try {
+    const response = await fetch(url);
+	if (response.ok) {
+	  const text = await response.text();
+	  if (isSimulation) {
+	    simulation_log_content.value = text;
+	  } else {
+	    log_content.value = text;
+	  }
+	  setTimeout(() => {
+	    const textarea = document.getElementById(textareaId);
+        if (textarea) {
+          textarea.scrollTop = textarea.scrollHeight; // Scroll to bottom
+        }
+	  }, 0);
+	}
+  } catch (error) {
+	// Silently ignore errors during polling to avoid spam
+	console.debug(`Error fetching ${isSimulation ? 'simulation ' : ''}log during polling:`, error);
+  }
+}
+
 async function fetch_show_simulation_results() {
   simulation_log_content.value = 'Fetching simulation results...';
   waveform_data.value = 'Fetching waveform data...';
@@ -299,7 +339,7 @@ async function fetch_show_simulation_results() {
   }
   
   // Fetch waveform data
-  const waveformUrl = `${import.meta.env.VITE_HOST}/download/${job_id.value}/waveform`;
+  const waveformUrl = `${import.meta.env.VITE_HOST}/download/${job_id.value}/wave`;
   try {
     const waveformResponse = await fetch(waveformUrl);
 	if (waveformResponse.ok) {
@@ -460,7 +500,7 @@ function openLocalSurferViewer() {
   if (waveform_data.value && waveform_data.value !== 'Failed to fetch waveform data.' && waveform_data.value !== 'Error fetching waveform data.' && waveform_data.value !== 'Fetching waveform data...') {
     const blob = new Blob([waveform_data.value], { type: 'text/plain' });
     const blobUrl = URL.createObjectURL(blob);
-    surferUrl = `/surfer/?url=${encodeURIComponent(blobUrl)}`;
+    surferUrl = `/surfer-viewer/?url=${encodeURIComponent(blobUrl)}`;
   }
   
   // Open Surfer in a new tab
@@ -480,7 +520,7 @@ function initializeSurferViewer() {
     // Create Surfer viewer iframe only if it doesn't exist
     iframe = document.createElement('iframe');
     iframe.style.width = '100%';
-    iframe.style.height = '400px';
+    iframe.style.height = '700px';
     iframe.style.border = '1px solid #ccc';
     iframe.style.borderRadius = '4px';
     viewerElement.appendChild(iframe);
@@ -1323,33 +1363,35 @@ Constraint = *.xdc, *.lpf, *.cst"
       </button>
       </div>
       <div class="btn-group bottom-button col-md-3">
-      <button class="btn btn-primary" :disabled="!simulation_available" @click="download('sim_log')">
-        Download Log
-      </button>
-      </div>
-      <div class="btn-group bottom-button col-md-3">
       <button class="btn btn-primary" :disabled="!simulation_available" @click="download('waveform')">
         Download Waveform
       </button>
       </div>
       <div class="btn-group bottom-button col-md-3">
-      <button class="btn btn-secondary" @click="openLocalSurferViewer()">
-        Open Surfer
+      <button class="btn btn-primary" :disabled="!simulation_available" @click="download('sim_log')">
+        Download Log
+      </button>
+      </div>
+      <div class="btn-group bottom-button col-md-3">
+      <button class="btn btn-dark" @click="openLocalSurferViewer()">
+        Open Surfer Externally
       </button>
       </div>
 		</div>
 	  <div class="row">
-      <div class="form-group col-md-6">
-		    <label>Simulation log</label>
-        <textarea class="form-control" id="simulation_log_textarea" readonly>{{ simulation_log_content }}</textarea>
-      </div>
-      <div class="form-group col-md-6">
+      <div class="form-group">
         <label>Waveform Viewer (Surfer)</label>
         <div id="surfer-viewer" class="waveform-container">
           <!-- Surfer viewer will be loaded here -->
         </div>
       </div>
 	  </div>
+    <div class="row">
+      <div class="form-group">
+		    <label>Simulation log</label>
+        <textarea class="form-control" id="simulation_log_textarea" readonly style="height: 300px;">{{ simulation_log_content }}</textarea>
+      </div>
+    </div>
     <br>
   </div>
 </template>
@@ -1419,7 +1461,7 @@ codemirror {
 }
 
 .waveform-container {
-  height: 400px;
+  height: 700px;
   border: 1px solid #ccc;
   border-radius: 4px;
   background-color: #f8f9fa;

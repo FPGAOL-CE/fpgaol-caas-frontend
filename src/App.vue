@@ -2,10 +2,13 @@
 import 'bootstrap/dist/css/bootstrap.css'
 import '@popperjs/core/dist/umd/popper'
 import 'bootstrap/dist/js/bootstrap'
+import { useRoute } from 'vue-router'
+
+const route = useRoute()
 </script>
 
 <template>
-  <nav class="navbar navbar-expand-sm navbar-light bg-light shadow-sm sticky-top">
+  <nav v-if="!route.path.startsWith('/surfer-viewer')" class="navbar navbar-expand-sm navbar-light bg-light shadow-sm sticky-top">
     <a class="navbar-brand px-3">
       <b>FPGAOL-CE</b><i class="subtitle ps-3">Compiling as a Service</i>
     </a>

@@ -2,6 +2,7 @@ import Home from '@/components/Home.vue'
 import ProjComp from '@/components/ProjComp.vue'
 import Feedback from '@/components/Feedback.vue'
 import About from '@/components/About.vue'
+import SurferViewer from '@/components/SurferViewer.vue'
 import { createRouter, createWebHistory } from 'vue-router'
 import { ref } from 'vue'
 
@@ -12,7 +13,12 @@ const routes = [
   { path: '/', component: Home },
   { path: '/projcomp', component: ProjComp },
   { path: '/feedback', component: Feedback },
-  { path: '/about', component: About }
+  { path: '/about', component: About },
+  { path: '/surfer-viewer', component: SurferViewer },
+  {
+    path: '/surfer-viewer/:catchAll(.*)*',
+    component: SurferViewer
+  }
 ]
 
 const router = createRouter({
