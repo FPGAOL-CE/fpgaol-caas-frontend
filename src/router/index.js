@@ -14,11 +14,17 @@ const routes = [
   { path: '/projcomp', component: ProjComp },
   { path: '/feedback', component: Feedback },
   { path: '/about', component: About },
-  { path: '/surfer-viewer', component: SurferViewer },
-  {
-    path: '/surfer-viewer/:catchAll(.*)*',
-    component: SurferViewer
-  }
+  { path: '/surfer', component: SurferViewer },
+  { path: '/surfer-viewer', component: SurferViewer }
+  // {
+  //   path: '/surfer/:catchAll(.*)*',
+  //   component: SurferViewer
+  // },
+  // {
+  //   path: '/surfer-viewer/:catchAll(.*)*',
+  //   component: SurferViewer,
+  //   props: true
+  // }
 ]
 
 const router = createRouter({

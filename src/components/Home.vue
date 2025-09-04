@@ -2,7 +2,7 @@
 import { Codemirror } from 'vue-codemirror'
 import { ref } from 'vue'
 import { computed } from 'vue'
-import { onMounted, watch } from 'vue'
+import { onMounted, onBeforeUnmount, watch } from 'vue'
 import { Terminal } from 'xterm'
 import { FitAddon } from 'xterm-addon-fit'
 import 'xterm/css/xterm.css'
@@ -58,10 +58,13 @@ const usblog_xterm = new Terminal({
   fontSize: 14
 })
 const cable = ref('auto')
-const auto_cable = ref('ft2232')
+const auto_cable = ref('cable ft2232')
 const flash_enabled = ref('')
 const cable_inuse = computed(() => {return cable.value == 'auto' ? auto_cable.value : cable.value})
 const wfl = ref('')
+const wfl_busy = ref(false)
+
+let __originalConsoleError = null
 
 const surferUrl = '/surfer-viewer/';
 
@@ -102,6 +105,7 @@ function click_me_blank() {
   job_id_bare.value = new_job_id()
   job_id_prefix.value = ''
   cable.value = 'auto'
+  auto_cable.value = 'ft2232'
   mode.value = 'bitstream'
   server_reply.value = 'No reply from server.'
   server_reply_sim.value = 'No reply from server.'
@@ -112,19 +116,26 @@ function click_me_blank() {
   log_content.value = ''
 }
 
-function click_me(repo, path, xdc_name, v_name, device, bend, top, jobidname) {
+function click_me(repo, path, xdc_name, v_name, sim_name, device, bend, top, jobidname, cable_in) {
   var gitbase = 'https://raw.githubusercontent.com/'
   var xdc_url = gitbase + repo + '/main/' + path + '/' + xdc_name
   var v_url = gitbase + repo + '/main/' + path + '/' + v_name
-  axios
-    .get(xdc_url)
-    .then(({ data }) => {
-      //console.log(data)
-      xdc.value = data
-    })
-    .catch(({ err }) => {
-      server_reply.value += '\nLoading xdc from GitHub failed: ' + err
-    })
+  var sim_url = sim_name ? gitbase + repo + '/main/' + path + '/' + sim_name : null
+  
+  // Load constraint file (for bitstream mode)
+  if (xdc_name) {
+    axios
+      .get(xdc_url)
+      .then(({ data }) => {
+        //console.log(data)
+        xdc.value = data
+      })
+      .catch(({ err }) => {
+        server_reply.value += '\nLoading xdc from GitHub failed: ' + err
+      })
+  }
+  
+  // Load Verilog source file
   axios
     .get(v_url)
     .then(({ data }) => {
@@ -134,12 +145,30 @@ function click_me(repo, path, xdc_name, v_name, device, bend, top, jobidname) {
     .catch(({ err }) => {
       server_reply.value += '\nLoading verilog code from GitHub failed: ' + err
     })
+  
+  // Load simulation file (for simulation mode)
+  if (sim_name && sim_url) {
+    axios
+      .get(sim_url)
+      .then(({ data }) => {
+        //console.log(data)
+        sim.value = data
+      })
+      .catch(({ err }) => {
+        server_reply_sim.value += '\nLoading simulation file from GitHub failed: ' + err
+      })
+  }
+  
   backend.value = 'auto'
   auto_backend.value = bend
   fpga_part.value = 'auto'
   auto_fpga_part.value = device
   top_name.value = top
   job_id_prefix.value = jobidname
+  if (cable_in && cable_in.trim() !== '') {
+    auto_cable.value = cable_in
+    cable.value = 'auto'
+  }
 }
 
 function click_me_github(url, urlconf, device, bend, top, jobidname) {
@@ -182,14 +211,16 @@ function poll() {
           log_available.value = true
           server_reply.value = data
           // Fetch final log
-          fetch_log_during_polling(false)
+          fetch_log_during_polling()
         } else {
           if (data.includes('succeeded')) {
             simulation_available.value = true
+            // Automatically fetch and show simulation results when simulation succeeds
+            fetch_show_simulation_results()
           }
           server_reply_sim.value = data
           // Fetch final simulation log
-          fetch_log_during_polling(true)
+          fetch_simulation_log_during_polling()
         }
         polling.value = false
       } else {
@@ -204,11 +235,11 @@ function poll() {
           if (mode.value === 'bitstream') {
             server_reply.value = animarr[cntr++ % 4] + '\t' + data
             // Fetch log during compilation
-            fetch_log_during_polling(false)
+            fetch_log_during_polling()
           } else {
             server_reply_sim.value = animarr[cntr++ % 4] + '\t' + data
             // Fetch simulation log during simulation
-            fetch_log_during_polling(true)
+            fetch_simulation_log_during_polling()
           }
           window.setTimeout(poll, timeout)
         }
@@ -253,7 +284,7 @@ function submit() {
     log_content.value = 'Waiting for compilation log...\n'
   } else {
     simulation_available.value = false
-    simulation_log_content.value = 'Waiting for simulation log...\n'
+    simulation_log_content.value = 'Starting simulation...\n'
   }
   
   window.setTimeout(poll, timeout)
@@ -285,24 +316,17 @@ async function fetch_show_log() {
   }
 }
 
-async function fetch_log_during_polling(isSimulation = false) {
+async function fetch_log_during_polling() {
   if (!polling.value || !job_id.value) return;
   
-  const logType = isSimulation ? 'sim_log' : 'log';
-  const url = `${import.meta.env.VITE_HOST}/download/${job_id.value}/${logType}`;
-  const textareaId = isSimulation ? 'simulation_log_textarea' : 'log_textarea';
-  
+  const url = `${import.meta.env.VITE_HOST}/download/${job_id.value}/log`;
   try {
     const response = await fetch(url);
 	if (response.ok) {
 	  const text = await response.text();
-	  if (isSimulation) {
-	    simulation_log_content.value = text;
-	  } else {
-	    log_content.value = text;
-	  }
+	  log_content.value = text;
 	  setTimeout(() => {
-	    const textarea = document.getElementById(textareaId);
+	    const textarea = document.getElementById('log_textarea');
         if (textarea) {
           textarea.scrollTop = textarea.scrollHeight; // Scroll to bottom
         }
@@ -310,7 +334,29 @@ async function fetch_log_during_polling(isSimulation = false) {
 	}
   } catch (error) {
 	// Silently ignore errors during polling to avoid spam
-	console.debug(`Error fetching ${isSimulation ? 'simulation ' : ''}log during polling:`, error);
+	console.debug('Error fetching log during polling:', error);
+  }
+}
+
+async function fetch_simulation_log_during_polling() {
+  if (!polling.value || !job_id.value) return;
+  
+  const logUrl = `${import.meta.env.VITE_HOST}/download/${job_id.value}/sim_log`;
+  try {
+    const logResponse = await fetch(logUrl);
+	if (logResponse.ok) {
+	  const logText = await logResponse.text();
+	  simulation_log_content.value = logText;
+	  setTimeout(() => {
+	    const textarea = document.getElementById('simulation_log_textarea');
+        if (textarea) {
+          textarea.scrollTop = textarea.scrollHeight; // Scroll to bottom
+        }
+	  }, 0);
+	}
+  } catch (error) {
+	// Silently ignore errors during polling to avoid spam
+	console.debug('Error fetching simulation log during polling:', error);
   }
 }
 
@@ -364,9 +410,9 @@ async function fetch_show_simulation_results() {
 
 
 function usb_log_append(text, error=0) {
-  if (error) usblog_xterm.write('\x1B[38;5;196m')
-  usblog_xterm.write(text + '\r\n');
-  if (error) usblog_xterm.write('\x1B[0;0m')
+	if (error) usblog_xterm.write('\x1B[38;5;196m')
+	usblog_xterm.write(text + '\r\n');
+	if (error) usblog_xterm.write('\x1B[0;0m')
 }
 
 async function detect_connected()
@@ -409,26 +455,43 @@ onMounted(() => {
 //  usblog_xterm.write('log..')
   fitAddon.fit();
 
-  webusb_connected.value = false;
-  wfl_loaded.value = false;
-  if (!navigator.usb) {
-    usb_log_append('ERROR: WebUSB not supported by this browser!', 1);
-    usb_log_append('Please use Chromium-based browsers and access the site with HTTPS', 1);
-	webusb_supported.value = false;
-  } else {
-	webusb_supported.value = true;
-    detect_connected();
-	load_wasmFPGALoader();
-  }
+	// Globally intercept console.error so errors from wasmFPGAloader_lite.js are captured
+	try {
+		__originalConsoleError = console.error;
+		console.error = (...args) => {
+			try { __originalConsoleError && __originalConsoleError.apply(console, args); } catch (_) {}
+			try {
+				const msg = args.map(a => {
+					try { if (a && a.stack) return a.stack; if (a && a.message) return a.message; return typeof a === 'string' ? a : JSON.stringify(a); } catch { return String(a); }
+				}).join(' ');
+				usblog_xterm.write('\x1B[38;5;213m')
+				usb_log_append(msg)
+				usblog_xterm.write('\x1B[0;0m')
+			} catch (_) {}
+		};
+	} catch (_) {}
+
+	webusb_connected.value = false;
+	wfl_loaded.value = false;
+	if (!navigator.usb) {
+		usb_log_append('ERROR: WebUSB not supported by this browser!', 1);
+		usb_log_append('Please use Chromium-based browsers and access the site with HTTPS', 1);
+		webusb_supported.value = false;
+	} else {
+		webusb_supported.value = true;
+		detect_connected();
+		load_wasmFPGALoader();
+	}
 })
 
 async function forget_all_devices(){
   const devices = await navigator.usb.getDevices();
   for (const device of devices) {
-	if (!device.opened) await device.open();
-	await device.reset();
-	await device.close();
     await device.forget();
+    // if (!device.opened) await device.open();
+    // await device.reset();
+    // await device.close();
+    // await device.forget();
   }
   usb_log_append('All devices unpaired.');
   usb_log_append('!!Please refresh page before connect!!', 1);
@@ -483,28 +546,85 @@ async function bit2FS() {
 }
 
 async function wfl_program(cmd){
-  if (cmd == 'detect') {
-    usb_log_append('Detecting FPGA...');
-	await wfl.value.callMain(['-c', cable_inuse.value, '--detect']);
-	//usb_log_append('Detection done.');
-  }
-  else if (cmd == 'program') {
-    usb_log_append('Programming bitstream to ' + 'SRAM' + '...');
-	await bit2FS();
-	await wfl.value.callMain(['-c', cable_inuse.value, '/' + bitname.value].concat(flash_enabled.value ? ['-f'] : []));
-  }
+	if (wfl_busy.value) {
+		// Pink color for warning
+		usblog_xterm.write('\x1B[38;5;213m')
+		usb_log_append('Another operation is still running. Please wait...')
+		usblog_xterm.write('\x1B[0;0m')
+		return;
+	}
+	wfl_busy.value = true;
+	try {
+		if (cmd == 'detect') {
+			usb_log_append('Detecting FPGA...');
+			if (cable_inuse.value === 'board ice40_generic') {
+				// Pink color for warning
+				usblog_xterm.write('\x1B[38;5;213m')
+				usb_log_append("Warning: iCE40 FPGAs do not have a JTAG detection interface. Detection will not work. Please program the bitstream directly.")
+				usblog_xterm.write('\x1B[0;0m')
+				return;
+			}
+      await wfl.value.callMain((() => {
+        const sel = cable_inuse.value;
+        const args = [];
+        if (sel.startsWith('board ')) {
+          args.push('-b', sel.substring(6));
+        } else if (sel.startsWith('cable ')) {
+          args.push('-c', sel.substring(6));
+        } else { args.push('-c', sel); }
+        args.push('--detect');
+        return args; })());
+			//usb_log_append('Detection done.');
+		}
+		else if (cmd == 'program') {
+			usb_log_append('Programming bitstream to ' + 'SRAM' + '...');
+			await bit2FS();
+			await wfl.value.callMain((() => {
+			const sel = cable_inuse.value;
+			const args = [];
+			if (sel.startsWith('board ')) {
+				args.push('-b', sel.substring(6));
+			} else if (sel.startsWith('cable ')) {
+				args.push('-c', sel.substring(6));
+			} else { args.push('-c', sel); }
+			args.push('/' + bitname.value); if (flash_enabled.value) { args.push('-f'); } return args; })());
+		}
+	} finally {
+		wfl_busy.value = false;
+	}
+}
+
+function parseTopModuleFromSimulation() {
+  try {
+    const text = sim.value || '';
+    const match = text.match(/module\s+([A-Za-z_]\w*)\s*\(\s*\)\s*;/);
+    if (match && match[1]) {
+      return match[1];
+    }
+  } catch (e) {}
+  return 'tb_top';
 }
 
 function openLocalSurferViewer() {
   // If we have waveform data, create a blob URL and open Surfer with it
   if (waveform_data.value && waveform_data.value !== 'Failed to fetch waveform data.' && waveform_data.value !== 'Error fetching waveform data.' && waveform_data.value !== 'Fetching waveform data...') {
-    const blob = new Blob([waveform_data.value], { type: 'text/plain' });
-    const blobUrl = URL.createObjectURL(blob);
-    surferUrl = `/surfer-viewer/?url=${encodeURIComponent(blobUrl)}`;
+    // const blob = new Blob([waveform_data.value], { type: 'text/plain' });
+    // const blobUrl = URL.createObjectURL(blob);
+    // surferUrl = `/surfer-viewer/?url=${encodeURIComponent(blobUrl)}`;
+
+    // Use the direct VCD file URL from the server
+    const vcdUrl = `${import.meta.env.VITE_HOST}/download/${job_id.value}/wave`;
+    const topModule = parseTopModuleFromSimulation();
+    // Open Surfer in a new tab with the VCD file URL and startup commands
+    const surferUrlWithVcd = `${surferUrl}?load_url=${encodeURIComponent(vcdUrl)}&startup_commands=${encodeURIComponent(`module_add ${topModule}`)}`;
+    window.open(surferUrlWithVcd, '_blank');
+    // TODO: waveform_data is not good, just need to store a vcd valid/invalid
+  }
+  else {
+    // Open Surfer in a new tab
+    window.open(surferUrl, '_blank');
   }
   
-  // Open Surfer in a new tab
-  window.open(surferUrl, '_blank');
 }
 
 function initializeSurferViewer() {
@@ -528,17 +648,26 @@ function initializeSurferViewer() {
   
   // Update iframe src if we have new waveform data
   if (waveform_data.value && waveform_data.value !== 'Failed to fetch waveform data.' && waveform_data.value !== 'Error fetching waveform data.' && waveform_data.value !== 'Fetching waveform data...') {
-    // Create a blob URL for the VCD data
-    const blob = new Blob([waveform_data.value], { type: 'text/plain' });
-    const blobUrl = URL.createObjectURL(blob);
+    // Use the direct VCD file URL from the server, same as external viewer
+    const vcdUrl = `${import.meta.env.VITE_HOST}/download/${job_id.value}/wave`;
+    const topModule = parseTopModuleFromSimulation();
     
-    // Set up Surfer viewer URL with the VCD data
-    iframe.src = `${surferUrl}?url=${encodeURIComponent(blobUrl)}`;
+    // Set up Surfer viewer URL with the VCD data using load_url parameter and startup commands
+    iframe.src = `${surferUrl}?load_url=${encodeURIComponent(vcdUrl)}&startup_commands=${encodeURIComponent(`module_add ${topModule}`)}`;
   } else if (!iframe.src || iframe.src === 'about:blank') {
     // Only set src if it's not already set
     iframe.src = surferUrl;
   }
 }
+
+onBeforeUnmount(() => {
+	try {
+		if (__originalConsoleError) {
+			console.error = __originalConsoleError;
+			__originalConsoleError = null;
+		}
+	} catch (_) {}
+})
 </script>
 
 <template>
@@ -568,10 +697,12 @@ function initializeSurferViewer() {
                   'fpgaol1/basic',
                   'fpgaol1.xdc',
                   'top.v',
+                  'tb_top.v',
                   'xc7a100tcsg324-1',
-				  'openxc7',
+                  'openxc7',
                   'top',
-                  'fpgaol1'
+                  'fpgaol1',
+                  ''
                 )
               "
               >FPGAOL1(for login users)</a
@@ -585,10 +716,12 @@ function initializeSurferViewer() {
                   'fpgaol2/basic',
                   'fpgaol2.xdc',
                   'top.v',
+                  'tb_top.v',
                   'xc7a100tcsg324-1',
-				  'openxc7',
+                  'openxc7',
                   'top',
-                  'fpgaol2'
+                  'fpgaol2',
+                  ''
                 )
               "
               >FPGAOL2(for guests)</a
@@ -602,10 +735,12 @@ function initializeSurferViewer() {
                   'basys3',
                   'Basys3_Master.xdc',
                   'top.v',
+                  'tb_top.v',
                   'xc7a35tcpg236-1',
-				  'openxc7',
+                  'openxc7',
                   'top',
-                  'basys3'
+                  'basys3',
+                  'board basys3'
                 )
               "
               >Digilent Basys 3 -- blinky</a
@@ -615,14 +750,16 @@ function initializeSurferViewer() {
               class="dropdown-item"
               @click="
                 click_me(
-                  'openxc7/demo-projects',
-                  'blinky-digilent-arty',
+                  'FPGAOL-CE/user-examples',
+                  'arty_a7',
                   'blinky.xdc',
                   'blinky.v',
+                  'tb_top.v',
                   'xc7a35tcsg324-1',
-				  'openxc7',
+                  'openxc7',
                   'blinky',
-                  'arty35t'
+                  'arty35t',
+                  'board arty_a7_35t'
                 )
               "
               >Digilent Arty 35t -- blinky</a
@@ -632,14 +769,16 @@ function initializeSurferViewer() {
               class="dropdown-item"
               @click="
                 click_me(
-                  'openxc7/demo-projects',
-                  'blinky-digilent-arty',
+                  'FPGAOL-CE/user-examples',
+                  'arty_a7',
                   'blinky.xdc',
                   'blinky.v',
+                  null,
                   'xc7a100tcsg324-1',
-				  'openxc7',
+                  'openxc7',
                   'blinky',
-                  'arty100t'
+                  'arty100t',
+                  'board arty_a7_100t'
                 )
               "
               >Digilent Arty 100t -- blinky</a
@@ -653,10 +792,12 @@ function initializeSurferViewer() {
                   'a7lite',
                   'a7lite.xdc',
                   'top.v',
+                  'tb_top.v',
                   'xc7a100tfgg484-1',
-				  'openxc7',
+                  'openxc7',
                   'top',
-                  'a7lite100t'
+                  'a7lite100t',
+                  'cable ft232'
                 )
               "
               >MicroPhase A7Lite 100t -- blinky</a
@@ -670,10 +811,12 @@ function initializeSurferViewer() {
                   'blinky-qmtech',
                   'blinky.xdc',
                   'blinky.v',
+                  null,
                   'xc7k325tffg676-1',
-				  'openxc7',
+                  'openxc7',
                   'blinky',
-                  'qmtechk7'
+                  'qmtechk7',
+                  'board qmtechKintex7'
                 )
               "
               >QMTech Kintex 7 -- blinky</a
@@ -687,10 +830,12 @@ function initializeSurferViewer() {
                   'blinky-genesys2',
                   'blinky.xdc',
                   'blinky.v',
+                  null,
                   'xc7k325tffg900-2',
-				          'openxc7',
+			          'openxc7',
                   'blinky',
-                  'genesys2'
+                  'genesys2',
+                  'board genesys2'
                 )
               "
               >Digilent Genesys 2 -- blinky</a
@@ -704,10 +849,12 @@ function initializeSurferViewer() {
                   'tangnano9k',
                   'tangnano9k.cst',
                   'blinky.v',
-                  'GW1NR-LV9QN88PC6\\\/I5',
-				          'gowin',
+                  'tb_blinky.v',
+                  'GW1NR-LV9QN88PC6\\/I5',
+			          'gowin',
                   'top',
-                  'tangnano9k'
+                  'tangnano9k',
+                  'board tangnano9k'
                 )
               "
               >Tang Nano 9K -- blinky</a
@@ -721,10 +868,12 @@ function initializeSurferViewer() {
                   'hdmi',
                   'hdmi.cst',
                   'fpga4fun_hdmi_test.v',
+                  null,
                   'GW1NR-LV9QN88PC6\\\/I5',
 				          'gowin',
                   'HDMI_test',
-                  'tangnano9k'
+                  'tangnano9k',
+                  'board tangnano9k'
                 )
               "
               >Tang Nano 9K -- HDMI</a
@@ -738,10 +887,12 @@ function initializeSurferViewer() {
                   'tangnano20k',
                   'tangnano20k.cst',
                   'blinky.v',
-                  'GW2AR-LV18QN88C8\\\/I7',
+                  'tb_blinky.v',
+                  'GW2AR-LV18QN88C8\\/I7',
 				          'gowin',
                   'top',
-                  'tangnano20k'
+                  'tangnano20k',
+                  'board tangnano20k'
                 )
               "
               >Tang Nano 20K -- blinky</a
@@ -755,10 +906,12 @@ function initializeSurferViewer() {
                   'icebreaker',
                   'icebreaker.pcf',
                   'pwm.v',
+                  'tb_pwm.v',
                   'ice40up5k-sg48',
-				          'ice40',
+			            'ice40',
                   'top',
-                  'icebreaker'
+                  'icebreaker',
+                  'board ice40_generic'
                 )
               "
               >Icebreaker -- rgbled</a
@@ -772,10 +925,12 @@ function initializeSurferViewer() {
                   'ulx3s',
                   'ulx3s_v20.lpf',
                   'blinky.v',
+                  'tb_blinky.v',
                   'lfe5u-25f-cabga381',
-				          'ecp5',
+                  'ecp5',
                   'top',
-                  'ulx3s'
+                  'ulx3s',
+                  'board ulx3s'
                 )
               "
               >ULX3S -- blinky</a
@@ -789,10 +944,12 @@ function initializeSurferViewer() {
                   'ulx3s',
                   'ulx3s_v20.lpf',
                   'blinky.v',
+                  'tb_blinky.v',
                   'lfe5u-85f-cabga381',
-				          'ecp5',
+                  'ecp5',
                   'top',
-                  'ulx3s'
+                  'ulx3s',
+                  'board ulx3s'
                 )
               "
               >ULX3S(85F) -- blinky</a
@@ -842,7 +999,63 @@ function initializeSurferViewer() {
               "
               >ULX3S(85F) -- blinky GitHub</a
             >
+            <a
+              v-if="activeTab == 'editor'"
+              class="dropdown-item"
+              @click="
+                click_me(
+                  'FPGAOL-CE/user-examples',
+                  'nexysa7',
+                  'Nexys-A7-100T-Master.xdc',
+                  'top.v',
+                  'tb_top.v',
+                  'xc7a50tcsg324-1',
+				  'openxc7',
+                  'top',
+                  'nexysa7_50t',
+                  'board nexys_a7'
+                )
+              "
+              >Digilent Nexys A7 50t -- blinky</a
+            >
+            <a
+              v-if="activeTab == 'editor'"
+              class="dropdown-item"
+              @click="
+                click_me(
+                  'FPGAOL-CE/user-examples',
+                  'nexysa7',
+                  'Nexys-A7-100T-Master.xdc',
+                  'top.v',
+                  'tb_top.v',
+                  'xc7a100tcsg324-1',
+				  'openxc7',
+                  'top',
+                  'nexysa7_100t',
+                  'board nexys_a7'
+                )
+              "
+              >Digilent Nexys A7 100t -- blinky</a
+            >
             <a class="dropdown-item" @click="click_me_blank">Reset</a>
+            <a
+              v-if="activeTab == 'editor'"
+              class="dropdown-item"
+              @click="
+                click_me(
+                  'FPGAOL-CE/user-examples',
+                  'boolean',
+                  'boolean.xdc',
+                  'top.v',
+                  'tb_top.v',
+                  'xc7s50csga324-1',
+                  'openxc7',
+                  'top',
+                  'boolean',
+                  'cable ft2232'
+                )
+              "
+              >Boolean (xc7s50csga324-1) -- blinky</a>
           </div>
         </div>
         <div class="form-group col-md-2" style="width: 9.99%">
@@ -1337,9 +1550,36 @@ Constraint = *.xdc, *.lpf, *.cst"
 			    <label>JTAG Cable Type</label>
 		    	<select id="" class="form-control" name="" v-model="cable">
 				  <option selected value="auto">Auto ({{ auto_cable }})</option>
-				  <option value="ft232">ft232</option>
-				  <option value="ft2232">ft2232</option>
-				  <option value="digilent">digilent</option>
+				  <!-- Cables -->
+				  <option value="cable ft232">cable ft232</option>
+				  <option value="cable ft2232">cable ft2232</option>
+				  <option value="cable ft4232">cable ft4232</option>
+				  <option value="cable ft231x">cable ft231x</option>
+				  <option value="cable dirtyJtag">cable dirtyJtag</option>
+				  <option value="cable digilent">cable digilent</option>
+				  <option value="cable jlink">cable jlink</option>
+				  <option value="cable usbblaster">cable usbblaster</option>
+				  <option value="cable ch347">cable ch347</option>
+				  <!-- Boards -->
+				  <option value="board basys3">board basys3</option>
+				  <option value="board arty_a7_35t">board arty_a7_35t</option>
+				  <option value="board arty_a7_100t">board arty_a7_100t</option>
+				  <option value="board arty_s7_25">board arty_s7_25</option>
+				  <option value="board arty_s7_50">board arty_s7_50</option>
+				  <option value="board genesys2">board genesys2</option>
+				  <option value="board nexys_a7">board nexys_a7</option>
+				  <option value="board icebreaker">board icebreaker</option>
+				  <option value="board ulx3s">board ulx3s</option>
+				  <option value="board tangnano">board tangnano</option>
+				  <option value="board tangnano9k">board tangnano9k</option>
+				  <option value="board tangnano20k">board tangnano20k</option>
+				  <option value="board efinix_jtag_ft2232">board efinix_jtag_ft2232</option>
+				  <option value="board zedboard">board zedboard</option>
+				  <option value="board zybo_z7_10">board zybo_z7_10</option>
+				  <option value="board zybo_z7_20">board zybo_z7_20</option>
+				  <option value="board ac701">board ac701</option>
+				  <option value="board qmtech_k7">board qmtech_k7</option>
+				  <option value="board ice40_generic">board ice40_generic</option>
 			    </select>
 			  </div>
 			  <div class="form-group col-md-6">
@@ -1357,22 +1597,22 @@ Constraint = *.xdc, *.lpf, *.cst"
   <!-- Simulation Mode Bottom Section -->
   <div v-show="mode === 'simulation'" class="container main-container">
     <div class="row">
-      <div class="btn-group bottom-button col-md-3">
+      <!-- <div class="btn-group bottom-button col-md-3">
       <button class="btn btn-primary" :disabled="!simulation_available" @click="fetch_show_simulation_results()">
         Fetch & Show Results
       </button>
-      </div>
-      <div class="btn-group bottom-button col-md-3">
-      <button class="btn btn-primary" :disabled="!simulation_available" @click="download('waveform')">
+      </div> -->
+      <div class="btn-group bottom-button col-md-4">
+      <button class="btn btn-primary" :disabled="!simulation_available" @click="download('wave')">
         Download Waveform
       </button>
       </div>
-      <div class="btn-group bottom-button col-md-3">
+      <div class="btn-group bottom-button col-md-4">
       <button class="btn btn-primary" :disabled="!simulation_available" @click="download('sim_log')">
         Download Log
       </button>
       </div>
-      <div class="btn-group bottom-button col-md-3">
+      <div class="btn-group bottom-button col-md-4">
       <button class="btn btn-dark" @click="openLocalSurferViewer()">
         Open Surfer Externally
       </button>

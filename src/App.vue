@@ -8,7 +8,7 @@ const route = useRoute()
 </script>
 
 <template>
-  <nav v-if="!route.path.startsWith('/surfer-viewer')" class="navbar navbar-expand-sm navbar-light bg-light shadow-sm sticky-top">
+  <nav v-if="!route.path.startsWith('/surfer')" class="navbar navbar-expand-sm navbar-light bg-light shadow-sm sticky-top">
     <a class="navbar-brand px-3">
       <b>FPGAOL-CE</b><i class="subtitle ps-3">Compiling as a Service</i>
     </a>
