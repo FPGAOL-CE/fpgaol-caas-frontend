@@ -63,6 +63,7 @@ const flash_enabled = ref('')
 const cable_inuse = computed(() => {return cable.value == 'auto' ? auto_cable.value : cable.value})
 const wfl = ref('')
 const wfl_busy = ref(false)
+const connected_usb_device = ref(null)
 
 let __originalConsoleError = null
 
@@ -415,11 +416,71 @@ function usb_log_append(text, error=0) {
 	if (error) usblog_xterm.write('\x1B[0;0m')
 }
 
+function getDeviceVidPid(device) {
+  if (!device) return { vid: '0x0000', pid: '0x0000' };
+  const vid = '0x' + device.vendorId.toString(16).padStart(4, '0').toUpperCase();
+  const pid = '0x' + device.productId.toString(16).padStart(4, '0').toUpperCase();
+  return { vid, pid };
+}
+
+function getWindowsDriverCommand() {
+  const { vid, pid } = getDeviceVidPid(connected_usb_device.value);
+  return `cd %USERPROFILE%/Downloads && curl -o wdi-simple.exe https://caas.symbioticeda.com/public/wdi-simple.exe && wdi-simple.exe --vid ${vid} --pid ${pid} -t 0 -b`;
+}
+
+function maybeShowUsbAccessDeniedGuidance(message) {
+	try {
+		const text = (message ?? '').toString().toLowerCase();
+		// Rough match: look for key words only, ignore punctuation/case
+		if (
+      //SecurityError: Failed to execute 'open' on 'USBDevice': Access denied.
+			text.includes('securityerror') &&
+			text.includes('usbdevice') &&
+			text.includes('open') &&
+			text.includes('access denied') || 
+      // NetworkError: Failed to execute 'claimInterface' on 'USBDevice': Unable to claim interface.
+      text.includes('networkerror') &&
+      text.includes('usbdevice') &&
+      (text.includes('claiminterface')) &&
+      text.includes('unable to claim interface') ||
+      // NetworkError: Failed to execute 'conntrolTransferIn' on 'USBDevice': A transfer error has occurred. 
+      text.includes('networkerror') &&
+      text.includes('usbdevice') &&
+      (text.includes('controltransferin')) &&
+      text.includes('a transfer error has occurred')
+		) {
+			// Bright orange colored user notification
+			usblog_xterm.write('\x1B[38;5;208m');
+			usb_log_append('!!!!!!');
+			
+			// Check if connected device is FTDI (VID 0x0403)
+			const isFtdiDevice = connected_usb_device.value && 
+				connected_usb_device.value.vendorId === 0x0403;
+			
+			if (isFtdiDevice) {
+				usb_log_append('You are using an FTDI JTAG cable. \n\rTo make them work with WebUSB, run the following command on your host computer:\n\r');
+				usb_log_append('Linux Terminal: sudo rmmod ftdi_sio');
+				usb_log_append('Windows CMD: ' + getWindowsDriverCommand());
+        usb_log_append('')
+				usb_log_append('For details, please check xxxxxx');
+			} else {
+        usb_log_append('Are you selecting the correct USB device?');
+      }
+			
+			usb_log_append('!!!!!!');
+			usblog_xterm.write('\x1B[0;0m');
+		}
+	} catch (_) {}
+}
+
 async function detect_connected()
 {
 	const devices = await navigator.usb.getDevices();
 	if (devices.length != 0) {
+	  connected_usb_device.value = devices[0];
 	  usb_log_append('Device already connected: ' + devices[0].manufacturerName + ' - ' + devices[0].productName);
+	  const { vid, pid } = getDeviceVidPid(devices[0]);
+	  usb_log_append('Device VID:PID = ' + vid + ':' + pid);
 	  webusb_connected.value = true;
 	}
 }
@@ -467,6 +528,7 @@ onMounted(() => {
 				usblog_xterm.write('\x1B[38;5;213m')
 				usb_log_append(msg)
 				usblog_xterm.write('\x1B[0;0m')
+				maybeShowUsbAccessDeniedGuidance(msg)
 			} catch (_) {}
 		};
 	} catch (_) {}
@@ -506,7 +568,10 @@ async function connect_usb() {
   usb_log_append('Connect a new device...');
   try {
     const device = await navigator.usb.requestDevice({ filters: [] });
+    connected_usb_device.value = device;
     usb_log_append('Device selected: ' + device.manufacturerName + ', ' + device.productName);
+    const { vid, pid } = getDeviceVidPid(device);
+    usb_log_append('Device VID:PID = ' + vid + ':' + pid);
 	webusb_connected.value = true;
   } catch (error) {
     if (error instanceof DOMException && error.name === 'NotFoundError') {
