@@ -434,10 +434,10 @@ function maybeShowUsbAccessDeniedGuidance(message) {
 		// Rough match: look for key words only, ignore punctuation/case
 		if (
       //SecurityError: Failed to execute 'open' on 'USBDevice': Access denied.
-			text.includes('securityerror') &&
-			text.includes('usbdevice') &&
-			text.includes('open') &&
-			text.includes('access denied') || 
+			// text.includes('securityerror') &&
+			// text.includes('usbdevice') &&
+			// text.includes('open') &&
+			// text.includes('access denied') || 
       // NetworkError: Failed to execute 'claimInterface' on 'USBDevice': Unable to claim interface.
       text.includes('networkerror') &&
       text.includes('usbdevice') &&
@@ -462,7 +462,7 @@ function maybeShowUsbAccessDeniedGuidance(message) {
 				usb_log_append('Linux Terminal: sudo rmmod ftdi_sio');
 				usb_log_append('Windows CMD: ' + getWindowsDriverCommand());
         usb_log_append('')
-				usb_log_append('For details, please check xxxxxx');
+				usb_log_append('For details, please check https://github.com/FPGAOL-CE/caas-wizard/blob/main/docs/WebUSB%20Drivers%20FTDI.md');
 			} else {
         usb_log_append('Are you selecting the correct USB device?');
       }
@@ -512,7 +512,7 @@ onMounted(() => {
   const fitAddon = new FitAddon();
   usblog_xterm.loadAddon(fitAddon);
   usblog_xterm.open(document.getElementById('usblog_xterm'));
-  //usblog_xterm.setOption('padding', { top: 5, left: 0, right: 10, bottom: 5 });
+  // usblog_xterm.setOption('padding', { top: 5, left: 0, right: 10, bottom: 5 });
 //  usblog_xterm.write('log..')
   fitAddon.fit();
 
@@ -1761,6 +1761,8 @@ codemirror {
 
 .xterm {
 	height: 100%;
+  padding-right: 0px;
+  padding-left: 6px;
 	max-height: 300px;
 	box-sizing: border-box;
 }
