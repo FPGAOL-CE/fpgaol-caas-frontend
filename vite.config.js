@@ -16,7 +16,8 @@ export default defineConfig({
 	  vue(),
 	  viteStaticCopy({ targets: [
 		  { src: 'public/wasmFPGAloader_lite.js', dest: 'public' },
-		  { src: 'public/wasmFPGAloader_lite.wasm', dest: 'public' }
+		  { src: 'public/wasmFPGAloader_lite.wasm', dest: 'public' },
+		  { src: 'public/wdi-simple.exe', dest: 'public' }
 	  ] })
   ],
   server: {

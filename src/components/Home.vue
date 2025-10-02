@@ -184,7 +184,7 @@ function click_me_github(url, urlconf, device, bend, top, jobidname) {
 }
 
 const polling = ref(false)
-const timeout = 3000 // query interval
+const timeout = 5000 // query interval
 const bitstream_available = ref(false)
 const log_available = ref(false)
 const simulation_available = ref(false)
@@ -276,9 +276,7 @@ function submit() {
   axios.post(
     import.meta.env.VITE_HOST + '/submit',
     new URLSearchParams(postData)
-  )
-  polling.value = true
-  
+  ).then(() => {
   if (mode.value === 'bitstream') {
     bitstream_available.value = false
     log_available.value = false
@@ -287,8 +285,9 @@ function submit() {
     simulation_available.value = false
     simulation_log_content.value = 'Starting simulation...\n'
   }
-  
-  window.setTimeout(poll, timeout)
+  window.setTimeout(poll, 0.1)
+  })
+  polling.value = true
 }
 
 function download(filetype) {
@@ -434,10 +433,10 @@ function maybeShowUsbAccessDeniedGuidance(message) {
 		// Rough match: look for key words only, ignore punctuation/case
 		if (
       //SecurityError: Failed to execute 'open' on 'USBDevice': Access denied.
-			// text.includes('securityerror') &&
-			// text.includes('usbdevice') &&
-			// text.includes('open') &&
-			// text.includes('access denied') || 
+			text.includes('securityerror') &&
+			text.includes('usbdevice') &&
+			text.includes('open') &&
+			text.includes('access denied') || 
       // NetworkError: Failed to execute 'claimInterface' on 'USBDevice': Unable to claim interface.
       text.includes('networkerror') &&
       text.includes('usbdevice') &&
